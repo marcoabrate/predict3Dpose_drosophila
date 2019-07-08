@@ -1,0 +1,5 @@
+Since we want to remove 5 of the 7 cameras, wouldn't be difficult to train the network
+to estimate 2d pose since we don't have the correction anymore?
+Is the solution to use pre-trained weights and release the software without the
+possibility to train on other datasets? Isn't there a mechanisms that trains the network
+while running (during prediction)? Isn't this affected when using just 2 cameras?
