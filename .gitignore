@@ -1,3 +1,15 @@
 __pycache__
 *.py[cod]
 *$py.class
+
+3d-pose-baseline/data
+3d-pose-baseline/experiments
+*~
+*.pyc
+*.h5
+*.mp4
+*.mpeg
+*.swp
+*.png
+*.tar.gz
+

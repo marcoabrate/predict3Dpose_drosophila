@@ -1,0 +1,2 @@
+image dimensions:
+ 960 x 480

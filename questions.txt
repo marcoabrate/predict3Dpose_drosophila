@@ -1,5 +1,72 @@
+STACKED HOURGLASS:
 Since we want to remove 5 of the 7 cameras, wouldn't be difficult to train the network
 to estimate 2d pose since we don't have the correction anymore?
 Is the solution to use pre-trained weights and release the software without the
 possibility to train on other datasets? Isn't there a mechanisms that trains the network
 while running (during prediction)? Isn't this affected when using just 2 cameras?
+
+CAMERAS PARAMS:
+R: 3x3 Camera rotation matrix
+T: 3x1 Camera translation parameters
+f: (scalar) Camera focal length
+c: 2x1 Camera center
+k: 3x1 Camera radial distortion coefficients
+p: 2x1 Camera tangential distortion coefficients
+
+3D DATA:
+
+general coordinates:
+dictionary of 150 keys
+(n samples, 96)
+
+camera coordinates:
+dictionary of 150*N_CAMS keys (600 in our case)
+poses: (n samples, 96)
+
+postprocess:
+> train_set = poses - np.tile( poses[:,:3], [1, len(H36M_NAMES)] )
+		    ^we subtract the root positions every 3 columns
+> train_root_positions: (n samples, 3)
+
+complete train_set:
+(1559752, 96)
+
+normalization:
+data mean (on complete train_set)
+data std deviation (on complete train_Set)
+> dimensions_to_use: (48,)
+> dimensions_to_ignore (48,)
+  ^they contain numbers from 0 to 95 (which is the dimension of the complete train_set
+  ^of course, the dimensions in dimensions_to_use are not in dimensions_to_ignore and vice versa
+
+normalization:
+!!! here we work ONLY with the dimensions_to_use
+subtract mean and divide by standard deviation (calculated on the dimensions_to_use)
+return a dictionary (of 600 keys) made of data[:, dimensions_to_use]
+
+3D data dimension: dictionary of 600 (150*N_CAMS) keys, values are (n samples, 48)
+
+2D DATA:
+
+reading stacked hourglass prediction:
+> poses: (n samples, 16, 2) reshape> (n samples, 32)
+> dim_to_use: (32,)
+> poses_final = np.zeros((n samples, 64))
+  poses_final[dim_to_use] = poses
+return a dictionary (of 600 keys) made of poses_final
+
+complete train_set:
+(1559752, 64)
+
+normalization:
+data mean (on complete train_set)
+data std deviation (on complete train_Set)
+> dimensions_to_use: (32,)
+> dimensions_to_ignore (32,)
+  ^they contain numbers from 0 to 64 (which is the dimension of the complete train_set
+  ^of course, the dimensions in dimensions_to_use are not in dimensions_to_ignore and vice versa
+
+normalization:
+!!! here we work ONLY with the dimensions_to_use
+subtract mean and divide by standard deviation (calculated on the dimensions_to_use)
+return a dictionary (of 600 keys) made of data[:, dimensions_to_use]
