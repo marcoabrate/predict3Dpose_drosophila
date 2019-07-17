@@ -1,7 +1,4 @@
 __pycache__
-*.py[cod]
-*$py.class
-
 3d-pose-baseline/data
 3d-pose-baseline/experiments
 *~
@@ -12,4 +9,3 @@ __pycache__
 *.swp
 *.png
 *.tar.gz
-
