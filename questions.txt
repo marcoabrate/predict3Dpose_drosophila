@@ -70,3 +70,10 @@ normalization:
 !!! here we work ONLY with the dimensions_to_use
 subtract mean and divide by standard deviation (calculated on the dimensions_to_use)
 return a dictionary (of 600 keys) made of data[:, dimensions_to_use]
+
+DATA NORMALIZATION:
+since we remove the root positions (first 3 numbers) from every entry, mean and standard deviation are ZERO for those entries. In the 3d estimation baseline they ignore these 3 dimensions for training. Should i do the same? When we apply normalization, we encounter NaN
+
+DIMENSIONS TO USE:
+3d: [ 1  2  3  6  7  8 12 13 14 15 17 18 19 25 26 27]
+2d: [ 0  1  2  3  6  7  8 12 13 15 17 18 19 25 26 27]

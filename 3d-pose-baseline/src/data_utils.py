@@ -209,16 +209,20 @@ def normalization_stats(complete_data, dim, predict_14=False ):
 
   data_mean = np.mean(complete_data, axis=0)
   data_std  =  np.std(complete_data, axis=0)
-
+  
   # Encodes which 17 (or 14) 2d-3d pairs we are predicting
   dimensions_to_ignore = []
   if dim == 2:
     dimensions_to_use    = np.where(np.array([x != '' and x != 'Neck/Nose' for x in H36M_NAMES]))[0]
+    print("dimensions to use in 2d: ")
+    print(dimensions_to_use)
     dimensions_to_use    = np.sort( np.hstack( (dimensions_to_use*2, dimensions_to_use*2+1)))
     dimensions_to_ignore = np.delete( np.arange(len(H36M_NAMES)*2), dimensions_to_use )
   else: # dim == 3
     dimensions_to_use = np.where(np.array([x != '' for x in H36M_NAMES]))[0]
     dimensions_to_use = np.delete( dimensions_to_use, [0,7,9] if predict_14 else 0 )
+    print("dimensions to use in 3d: ")
+    print(dimensions_to_use)
     
     dimensions_to_use = np.sort( np.hstack( (dimensions_to_use*3,
                                              dimensions_to_use*3+1,

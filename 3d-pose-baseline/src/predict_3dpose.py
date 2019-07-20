@@ -146,6 +146,7 @@ def train():
     train_set_2d, test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = data_utils.read_2d_predictions(actions, FLAGS.data_dir)
   else:
     train_set_2d, test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = data_utils.create_2d_data( actions, FLAGS.data_dir, rcams )
+
   print( "done reading and normalizing data." )
 
   # Avoid using the GPU if requested
@@ -522,4 +523,4 @@ def main(_):
     train()
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()
