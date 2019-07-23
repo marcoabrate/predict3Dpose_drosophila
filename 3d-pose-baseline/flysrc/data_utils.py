@@ -14,19 +14,22 @@ import glob
 import copy
 import sys
 import readpickle
+from random import shuffle
 
-TRAIN_SUBJECTS = range(0, 700)
-TEST_SUBJECTS = range(700, 800)
+TRAIN_SUBJECTS = range(0, 900+899)
+TEST_SUBJECTS = range(900+899, 900+899+899)
+CAMERA_TO_USE = 2
 
 DIMENSIONS = 38
-DIMENSIONS_TO_USE = range(0, 15)
+ROOT_POSITIONS_DIM = []
+DIMENSIONS_TO_USE = [x for x in range(15) if x not in ROOT_POSITIONS_DIM]
 
-def load_data( bpath, subjects ):
+def load_data( data_dir, subjects, dim ):
   """
   Loads 2d ground truth from disk, and puts it in an easy-to-acess dictionary
 
   Args
-    bpath: String. Pickle file where to load the data from
+    data_dir: String. Pickle file where to load the data from
     subjects: List of integers. Subjects whose data will be loaded
     dim: Integer={2,3}. Load 2 or 3-dimensional data
   Returns:
@@ -35,41 +38,24 @@ def load_data( bpath, subjects ):
   """
 
   data = {}
-
-  dic = readpickle.read_data(bpath)
-  d3_data = dic['points3d']
+  files = [os.path.join(data_dir, f) \
+     for f in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir, f))]
+  dics = []
+  for f in files:
+    if dim == 3:
+      dics.append(readpickle.read_data(f)['points3d'])
+    else: # dim == 2
+      dics.append(readpickle.read_data(f)['points2d'][CAMERA_TO_USE-1])
+  d_data = np.vstack(dics)
   print('Reading subjects...')
 
   for subj in subjects:
-    data[ (subj, 0) ] = d3_data[subj]
-    
-  return data
-
-
-def load_stacked_hourglass(data_dir, subjects):
-  """
-  Load 2d detections from disk, and put it in an easy-to-acess dictionary.
-
-  Args
-    data_dir: string. Pickle file where to load the data from,
-    subjects: list of integers. Subjects whose data will be loaded.
-  Returns
-    data: dictionary with keys k=(subject, camera)
-    values: matrix (38, 2) with the 3d points data
-  """
-
-  data = {}
+    if dim == 3:
+      data[ (subj, 0) ] = d_data[subj]
+    else: # dim == 2
+      data[ (subj, CAMERA_TO_USE) ] = d_data[subj]
   
-  dic = readpickle.read_data(data_dir)
-  d2_data = dic['points2d']
-  print('Reading subjects...')
-
-  for subj in subjects:
-    for c in range(7): # there are 7 cameras
-      data[ (subj, c+1) ] = d2_data[c][subj]
-
   return data
-
 
 def normalization_stats(complete_data, dim ):
   """
@@ -90,7 +76,6 @@ def normalization_stats(complete_data, dim ):
   data_mean = np.mean(complete_data, axis=0)
   data_std = np.std(complete_data, axis=0)
 
-  # Encodes which 17 (or 14) 2d-3d pairs we are predicting
   dimensions_to_ignore = []
   if dim == 2:
     dimensions_to_use = np.sort( np.hstack((np.array(DIMENSIONS_TO_USE)*2,
@@ -148,11 +133,9 @@ def normalize_data(data, data_mean, data_std, dim_to_use, dim):
   data_out = {}
   
   for key in data.keys():
-    data[ key ] = np.reshape(data[ key ], (-1, dim*DIMENSIONS))
-    data[ key ] = data[ key ][ :, dim_to_use ]
-    mu = data_mean[dim_to_use]
-    stddev = data_std[dim_to_use]
-    data_out[ key ] = np.divide( (data[key] - mu), stddev )
+    data_out[ key ] = np.reshape(data[ key ], (-1, dim*DIMENSIONS))
+    data_out[ key ][:, dim_to_use] = \
+      np.divide( (data_out[key][:, dim_to_use] - data_mean[dim_to_use]), data_std[dim_to_use] )
   
   return data_out
 
@@ -171,13 +154,13 @@ def unNormalize_dic(data, data_mean, data_std, dim_to_use):
   data_out = {}
 
   for key in data.keys():
-    mu = data_mean[dim_to_use]
-    stddev = data_std[dim_to_use]
-    data_out[ key ] = np.multiply( data[key], stddev ) + mu
+    data_out[key] = np.copy(data[key])
+    data_out[ key ][:, dim_to_use] = \
+       np.multiply( data_out[key][:, dim_to_use], data_std[dim_to_use] ) + data_mean[dim_to_use]
 
   return data_out
 
-def unNormalize_batch(normalized_data, data_mean, data_std, dimensions_to_use):
+def unNormalize_batch(normalized_data, data_mean, data_std, dim_to_use):
   """
   Un-normalizes a matrix whose mean has been substracted and that has been divided by
   standard deviation. Some dimensions might also be missing
@@ -186,7 +169,7 @@ def unNormalize_batch(normalized_data, data_mean, data_std, dimensions_to_use):
     normalized_data: nxd matrix to unnormalize
     data_mean: np vector with the mean of the data
     data_std: np vector with the standard deviation of the data
-    dimensions_to_use: list of dimensions that are used in the original data
+    dim_to_use: list of dimensions that are used in the original data
   Returns
     orig_data: the input normalized_data, but unnormalized
   """
@@ -194,8 +177,7 @@ def unNormalize_batch(normalized_data, data_mean, data_std, dimensions_to_use):
   D = data_mean.shape[0] # Dimensionality
 
   orig_data = np.zeros((T, D), dtype=np.float32)
-
-  orig_data[:, dimensions_to_use] = normalized_data
+  orig_data[:, dim_to_use] = normalized_data
 
   # Multiply times stdev and add the mean
   stdMat = data_std.reshape((1, D))
@@ -203,6 +185,7 @@ def unNormalize_batch(normalized_data, data_mean, data_std, dimensions_to_use):
   meanMat = data_mean.reshape((1, D))
   meanMat = np.repeat(meanMat, T, axis=0)
   orig_data = np.multiply(orig_data, stdMat) + meanMat
+  
   return orig_data
 
 def project_to_cameras( poses_set, cams, ncams=4 ):
@@ -248,13 +231,14 @@ def read_2d_predictions( data_dir ):
     dim_to_use: list with the dimensions to predict
   """
 
-  train_set = load_stacked_hourglass( data_dir, TRAIN_SUBJECTS )
-  test_set  = load_stacked_hourglass( data_dir, TEST_SUBJECTS )
+  train_set = load_data( data_dir, TRAIN_SUBJECTS, dim=2 )
+  test_set  = load_data( data_dir, TEST_SUBJECTS, dim=2 )
 
   # Compute normalization statistics
   complete_train = np.copy( np.vstack( list(train_set.values()) ).reshape((-1, DIMENSIONS*2)) )
   data_mean, data_std, dim_to_ignore, dim_to_use = \
     normalization_stats( complete_train, dim=2 )
+  # the root of the legs have STD = 0 !!! so dimensions 0, 5, 10 are NaN in 2d
   
   train_set = normalize_data( train_set, data_mean, data_std, dim_to_use, dim=2 )
   test_set  = normalize_data( test_set,  data_mean, data_std, dim_to_use, dim=2 )
@@ -283,8 +267,8 @@ def read_3d_data( data_dir, camera_frame, rcams ):
   print("Dimensions to use: ")
   print(DIMENSIONS_TO_USE)
   # Load 3d data
-  train_set = load_data( data_dir, TRAIN_SUBJECTS )
-  test_set  = load_data( data_dir, TEST_SUBJECTS )
+  train_set = load_data( data_dir, TRAIN_SUBJECTS, dim=3 )
+  test_set  = load_data( data_dir, TEST_SUBJECTS, dim=3 )
   
   if camera_frame:
     train_set = transform_world_to_camera( train_set, rcams )
@@ -294,8 +278,8 @@ def read_3d_data( data_dir, camera_frame, rcams ):
   # Apply 3d post-processing (centering around root)
   #train_set, train_root_positions = postprocess_3d( train_set )
   #test_set,  test_root_positions  = postprocess_3d( test_set )
-  train_root_positions = np.array([0, 0, 0])
-  test_root_positions = np.array([0, 0, 0])
+  train_root_positions = [0, 0, 0]
+  test_root_positions = [0, 0, 0]
   # Compute normalization statistics
   complete_train = np.copy( np.vstack( list(train_set.values()) ).reshape((-1, DIMENSIONS*3)) )
   data_mean, data_std, dim_to_ignore, dim_to_use = \
@@ -321,8 +305,8 @@ def postprocess_3d( poses_set ):
   root_positions = {}
   for k in poses_set.keys():
     # Keep track of the global position
-    root_positions[k] = np.copy(poses_set[k][0])
-
+    root_positions[k] = np.copy(poses_set[k][ROOT_POSITIONS_DIM])
+    
     # Remove the root from the 3d position
     poses = poses_set[k]
     poses = poses - np.tile( poses[0], (poses.shape[0], 1) )

@@ -9,10 +9,12 @@ import h5py
 import os
 from mpl_toolkits.mplot3d import Axes3D
 import sys
+import random
 
 COLORS = ["#3498db", "#e74c3c", "#32cd32"]
+TEST_COLORS = ["#5b2c6f", "#212f3c", "#641e16"]
 
-def show3Dpose(channels, ax):
+def show3Dpose(channels, ax, test_colors=False):
   """
   Visualize a 3d skeleton
 
@@ -41,7 +43,10 @@ def show3Dpose(channels, ax):
     x, z, y = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
     y *= -1
     z *= -1
-    ax.plot(x, y, z, lw=2, c=COLORS[cidx])
+    if not test_colors:
+      ax.plot(x, y, z, lw=2, c=COLORS[cidx])
+    else:
+      ax.plot(x, y, z, lw=2, c=TEST_COLORS[cidx])
     if (i+1)%4 == 0:
       cidx += 1
 
@@ -123,24 +128,28 @@ def show2Dpose(channels, ax):
 def visualize_train_sample(train2d, train3d):
   # 1080p       = 1,920 x 1,080
   fig = plt.figure( figsize=(19.2, 10.8) )
-
-  gs1 = gridspec.GridSpec(3, 1*2) # 3 rows, 6 columns
+  
+  nrows = 3
+  ncols = 2
+  gs1 = gridspec.GridSpec(nrows, ncols*2)
   gs1.update(wspace=-0.00, hspace=0.05) # set the spacing between axes.
   plt.axis('off')
 
   subplot_idx = 1
-  camera = 1 # there are 7 cameras in total
-  nsamples = 3
-  for subj in np.random.randint(0, 700, size=(nsamples,)):
+  camera = data_utils.CAMERA_TO_USE
+  nsamples = nrows*ncols
+  for (subj, _) in random.sample(list(train2d.keys()), nsamples):
 
     # Plot 2d pose
     ax1 = plt.subplot(gs1[subplot_idx-1])
+    ax1.set_title("2D pose, subject {0}".format(subj), fontsize=5)
     p2d = train2d[ (subj, camera) ] 
     show2Dpose( p2d, ax1 )
     ax1.invert_yaxis()
 
     # Plot 3d pose
     ax2 = plt.subplot(gs1[subplot_idx], projection='3d')
+    ax2.set_title("3D pose, subject {0}".format(subj), fontsize=5)
     p3d = train3d[ (subj, 0) ]
     show3Dpose( p3d, ax2 )
 
@@ -148,30 +157,40 @@ def visualize_train_sample(train2d, train3d):
 
   plt.show()
 
-def visualize_test_sample(train2d, train3d, poses3d):
+def visualize_test_sample(test2d, test3d, predic):
   # 1080p       = 1,920 x 1,080
   fig = plt.figure( figsize=(19.2, 10.8) )
-
-  gs1 = gridspec.GridSpec(5, 9) # 5 rows, 9 columns
+  
+  nrows = 3
+  ncols = 2
+  gs1 = gridspec.GridSpec(nrows, ncols*3)
   gs1.update(wspace=-0.00, hspace=0.05) # set the spacing between axes.
   plt.axis('off')
 
   subplot_idx = 1
-  camera = 1 # there are 7 cameras in total
-  nsamples = 15
-  for subj in np.random.randint(0, 700, size=(nsamples,)):
-
+  camera = data_utils.CAMERA_TO_USE
+  nsamples = nrows*ncols
+  
+  for subj in np.random.randint(test2d.shape[0], size=(nsamples,)):
     # Plot 2d pose
     ax1 = plt.subplot(gs1[subplot_idx-1])
-    p2d = train2d[ (subj, camera) ]
+    ax1.set_title("2D pose, subject {0}".format(subj), fontsize=5)
+    p2d = test2d[subj].reshape((1, -1))
     show2Dpose( p2d, ax1 )
     ax1.invert_yaxis()
 
-    # Plot 3d pose
+    # Plot 3d ground truth
     ax2 = plt.subplot(gs1[subplot_idx], projection='3d')
-    p3d = train3d[ (subj, 0) ]
+    ax2.set_title("Ground truth, subject {0}".format(subj), fontsize=5)
+    p3d = test3d[subj].reshape((1, -1))
     show3Dpose( p3d, ax2 )
 
-    subplot_idx += 2
+    # Plot 3d prediction
+    ax3 = plt.subplot(gs1[subplot_idx+1], projection='3d')
+    ax3.set_title("Prediction, subject {0}".format(subj), fontsize=5)
+    p3d = predic[subj].reshape((1, -1))
+    show3Dpose( p3d, ax3, test_colors=True )
+
+    subplot_idx += 3
 
   plt.show()

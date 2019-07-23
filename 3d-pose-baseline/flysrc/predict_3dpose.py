@@ -41,7 +41,7 @@ tf.app.flags.DEFINE_boolean("residual", False, "Whether to add a residual connec
 tf.app.flags.DEFINE_boolean("procrustes", False, "Apply procrustes analysis at test time")
 
 # Directories
-tf.app.flags.DEFINE_string("data_dir",   "flydata/pose_data_01.pkl", "Data directory")
+tf.app.flags.DEFINE_string("data_dir",   "flydata/", "Data directory")
 tf.app.flags.DEFINE_string("train_dir", "flyexperiments", "Training directory.")
 
 # Train or load
@@ -123,30 +123,48 @@ def train():
   rcams = cameras.load_cameras(FLAGS.data_dir)
 
   # Load 3d data and 2d projections
-  train_set_3d, test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d, \
+  full_train_set_3d, full_test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d, \
     train_root_positions, test_root_positions = data_utils.read_3d_data(
-      FLAGS.data_dir, FLAGS.camera_frame, rcams )
-  
-  print("3D training data (sample):")
-  for subj in np.random.randint(0, 700, size=(3,)):
-    print(train_set_3d[(subj, 0)].shape)
-  print("3D data mean shape: ", data_mean_3d.shape)
-  print("3D data std shape: ", data_std_3d.shape)
+    FLAGS.data_dir, FLAGS.camera_frame, rcams )
   
   # Read stacked hourglass 2D predictions
-  train_set_2d, test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
+  full_train_set_2d, full_test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
     data_utils.read_2d_predictions(FLAGS.data_dir)
-  print("2D training data (sample):")
-  for subj in np.random.randint(0, 700, size=(3,)):
-    print(train_set_2d[(subj, 3)].shape)
-  print("2D data mean shape: ", data_mean_2d.shape)
-  print("2D data std shape: ", data_std_2d.shape)
   
   print( "done reading and normalizing data." )
-  print("{0} training subjects, {1} test subjects".format(len(train_set_3d), len(test_set_3d)))
+  print("{0} training subjects, {1} test subjects".format(len(full_train_set_3d), len(full_test_set_3d)))
   viz.visualize_train_sample(
-    data_utils.unNormalize_dic(train_set_2d, data_mean_2d, data_std_2d, dim_to_use_2d), 
-    data_utils.unNormalize_dic(train_set_3d, data_mean_3d, data_std_3d, dim_to_use_3d))
+    data_utils.unNormalize_dic(full_train_set_2d, data_mean_2d, data_std_2d, dim_to_use_2d), 
+    data_utils.unNormalize_dic(full_train_set_3d, data_mean_3d, data_std_3d, dim_to_use_3d))
+  
+  train_set_2d = {}
+  test_set_2d = {}
+  train_set_3d = {}
+  test_set_3d = {}
+  for k in full_train_set_3d:
+    (subj, c) = k
+    train_set_3d[k] = full_train_set_3d[k][:, dim_to_use_3d]
+    train_set_2d[(subj, 2)] = full_train_set_2d[(subj, 2)][:, dim_to_use_2d]
+  for k in full_test_set_3d:
+    (subj, c) = k
+    test_set_3d[k] = full_test_set_3d[k][:, dim_to_use_3d]
+    test_set_2d[(subj, 2)] = full_test_set_2d[(subj, 2)][:, dim_to_use_2d]
+
+  print("3D training data (sample):")
+  for k in random.sample(list(train_set_3d.keys()), 3):
+    print(train_set_3d[k].shape)
+  print("3D data mean:")
+  print(data_mean_3d)
+  print("3D data std:")
+  print(data_std_3d)
+
+  print("2D training data (sample):")
+  for k in random.sample(list(train_set_2d.keys()), 3):
+    print(train_set_2d[k].shape)
+  print("2D data mean:")
+  print(data_mean_2d)
+  print("2D data std:")
+  print(data_std_2d)
 
   # Avoid using the GPU if requested
   device_count = {"GPU": 0} if FLAGS.use_cpu else {"GPU": 1}
@@ -159,7 +177,7 @@ def train():
     model = create_model( sess, FLAGS.batch_size )
     model.train_writer.add_graph( sess.graph )
     print("Model created")
-
+    
     #=== This is the training loop ===
     step_time, loss, val_loss = 0.0, 0.0, 0.0
     current_step = 0 if FLAGS.load <= 0 else FLAGS.load + 1
@@ -347,123 +365,99 @@ def sample():
   rcams = cameras.load_cameras(FLAGS.data_dir)
 
   # Load 3d data and 2d projections
-  train_set_3d, test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d, \
+  full_train_set_3d, full_test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d, \
     train_root_positions, test_root_positions = data_utils.read_3d_data(
-      FLAGS.data_dir, FLAGS.camera_frame, rcams )
+    FLAGS.data_dir, FLAGS.camera_frame, rcams )
 
   # Read stacked hourglass 2D predictions
-  train_set_2d, test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
+  full_train_set_2d, full_test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
     data_utils.read_2d_predictions(FLAGS.data_dir)
 
   print( "done reading and normalizing data." )
+
+  train_set_2d = {}
+  test_set_2d = {}
+  train_set_3d = {}
+  test_set_3d = {}
+  for k in full_train_set_3d:
+    (subj, c) = k
+    train_set_3d[k] = full_train_set_3d[k][:, dim_to_use_3d]
+    train_set_2d[(subj, 2)] = full_train_set_2d[(subj, 2)][:, dim_to_use_2d]
+  for k in full_test_set_3d:
+    (subj, c) = k
+    test_set_3d[k] = full_test_set_3d[k][:, dim_to_use_3d]
+    test_set_2d[(subj, 2)] = full_test_set_2d[(subj, 2)][:, dim_to_use_2d]
+  
+  print("3D test data (sample):")
+  for k in random.sample(list(test_set_3d.keys()), 3):
+    print(test_set_3d[k].shape)
+  print("2D test data (sample):")
+  for k in random.sample(list(test_set_2d.keys()), 3):
+    print(test_set_2d[k].shape)
 
   device_count = {"GPU": 0} if FLAGS.use_cpu else {"GPU": 1}
   with tf.Session(config=tf.ConfigProto( device_count = device_count )) as sess:
     # === Create the model ===
     print("Creating %d layers of %d units." % (FLAGS.num_layers, FLAGS.linear_size))
     batch_size = FLAGS.batch_size #128 ???
+    # Dropout probability 0 (keep probability 1) for sampling
+    dp = 1.0
+
     model = create_model(sess, batch_size)
     print("Model loaded")
+    encoder_inputs, decoder_outputs = \
+      model.get_all_batches( test_set_2d, test_set_3d, FLAGS.camera_frame, training=False)
+    nbatches = len( encoder_inputs )
+    print("There are {0} test batches".format( nbatches ))
+    
+    all_enc_in = []
+    all_dec_out = []
+    all_poses_3d = []
+    for i in range( nbatches ):
+      enc_in, dec_out = encoder_inputs[i], decoder_outputs[i]
+      _, _, poses3d = model.step(sess, enc_in, dec_out, dp, isTraining=False)
+      
+      # denormalize
+      enc_in  = data_utils.unNormalize_batch(enc_in, data_mean_2d, data_std_2d, dim_to_use_2d)
+      dec_out = data_utils.unNormalize_batch(dec_out, data_mean_3d, data_std_3d, dim_to_use_3d)
+      poses3d = data_utils.unNormalize_batch(poses3d, data_mean_3d, data_std_3d, dim_to_use_3d)
+      all_enc_in.append( enc_in )
+      all_dec_out.append( dec_out )
+      all_poses_3d.append( poses3d )
 
-    for key2d in test_set_2d.keys():
+    # Put all the poses together
+    enc_in, dec_out, poses3d = map( np.vstack, [all_enc_in, all_dec_out, all_poses_3d] )
+    
+    # Convert back to world coordinates
+    if FLAGS.camera_frame:
+      N_CAMERAS = 7
+      N_JOINTS_H36M = 32
 
-      (subj, camera) = key2d
-      print( "Subject: {}, camera: {}".format(subj, camera) )
+      # Add global position back
+      dec_out = dec_out + np.tile( test_root_positions[ key3d ], [1,N_JOINTS_H36M] )
 
-      key3d = (subj, 0)
-      enc_in  = test_set_2d[ key2d ]
-      n2d, _ = enc_in.shape
-      dec_out = test_set_3d[ key3d ]
-      n3d, _ = dec_out.shape
-      assert n2d == n3d
-      print(n2d, n3d)
-      # Split into about-same-size batches
-      enc_in   = np.array_split( enc_in,  n2d // batch_size )
-      dec_out  = np.array_split( dec_out, n3d // batch_size )
-      all_poses_3d = []
+      # Load the appropriate camera
+      subj, _, sname = key3d
 
-      for bidx in range( len(enc_in) ):
+      cname = sname.split('.')[1] # <-- camera name
+      scams = {(subj,c+1): rcams[(subj,c+1)] for c in range(N_CAMERAS)} # cams of this subject
+      scam_idx = [scams[(subj,c+1)][-1] for c in range(N_CAMERAS)].index( cname ) # index of camera used
+      the_cam  = scams[(subj, scam_idx+1)] # <-- the camera used
+      R, T, f, c, k, p, name = the_cam
+      assert name == cname
 
-        # Dropout probability 0 (keep probability 1) for sampling
-        dp = 1.0
-        _, _, poses3d = model.step(sess, enc_in[bidx], dec_out[bidx], dp, isTraining=False)
+      def cam2world_centered(data_3d_camframe):
+        data_3d_worldframe = cameras.camera_to_world_frame(data_3d_camframe.reshape((-1, 3)), R, T)
+        data_3d_worldframe = data_3d_worldframe.reshape((-1, N_JOINTS_H36M*3))
+        # subtract root translation
+        return data_3d_worldframe - np.tile( data_3d_worldframe[:,:3], (1,N_JOINTS_H36M) )
 
-        # denormalize
-        enc_in[bidx]  = data_utils.unNormalize_batch( enc_in[bidx], data_mean_2d, data_std_2d, dim_to_ignore_2d )
-        dec_out[bidx] = data_utils.unNormalize_batch( dec_out[bidx], data_mean_3d, data_std_3d, dim_to_ignore_3d )
-        poses3d = data_utils.unNormalize_batch( poses3d, data_mean_3d, data_std_3d, dim_to_ignore_3d )
-        all_poses_3d.append( poses3d )
+      # Apply inverse rotation and translation
+      dec_out = cam2world_centered(dec_out)
+      poses3d = cam2world_centered(poses3d)
 
-      # Put all the poses together
-      enc_in, dec_out, poses3d = map( np.vstack, [enc_in, dec_out, all_poses_3d] )
+    viz.visualize_test_sample(enc_in, dec_out, poses3d)
 
-      # Convert back to world coordinates
-      if FLAGS.camera_frame:
-        N_CAMERAS = 4
-        N_JOINTS_H36M = 32
-
-        # Add global position back
-        dec_out = dec_out + np.tile( test_root_positions[ key3d ], [1,N_JOINTS_H36M] )
-
-        # Load the appropriate camera
-        subj, _, sname = key3d
-
-        cname = sname.split('.')[1] # <-- camera name
-        scams = {(subj,c+1): rcams[(subj,c+1)] for c in range(N_CAMERAS)} # cams of this subject
-        scam_idx = [scams[(subj,c+1)][-1] for c in range(N_CAMERAS)].index( cname ) # index of camera used
-        the_cam  = scams[(subj, scam_idx+1)] # <-- the camera used
-        R, T, f, c, k, p, name = the_cam
-        assert name == cname
-
-        def cam2world_centered(data_3d_camframe):
-          data_3d_worldframe = cameras.camera_to_world_frame(data_3d_camframe.reshape((-1, 3)), R, T)
-          data_3d_worldframe = data_3d_worldframe.reshape((-1, N_JOINTS_H36M*3))
-          # subtract root translation
-          return data_3d_worldframe - np.tile( data_3d_worldframe[:,:3], (1,N_JOINTS_H36M) )
-
-        # Apply inverse rotation and translation
-        dec_out = cam2world_centered(dec_out)
-        poses3d = cam2world_centered(poses3d)
-
-  # Grab a random batch to visualize
-  enc_in, dec_out, poses3d = map( np.vstack, [enc_in, dec_out, poses3d] )
-  idx = np.random.permutation( enc_in.shape[0] )
-  enc_in, dec_out, poses3d = enc_in[idx, :], dec_out[idx, :], poses3d[idx, :]
-
-  # Visualize random samples
-  import matplotlib.gridspec as gridspec
-
-  # 1080p	= 1,920 x 1,080
-  fig = plt.figure( figsize=(19.2, 10.8) )
-
-  gs1 = gridspec.GridSpec(5, 9) # 5 rows, 9 columns
-  gs1.update(wspace=-0.00, hspace=0.05) # set the spacing between axes.
-  plt.axis('off')
-
-  subplot_idx, exidx = 1, 1
-  nsamples = 15
-  for i in np.arange( nsamples ):
-
-    # Plot 2d pose
-    ax1 = plt.subplot(gs1[subplot_idx-1])
-    p2d = enc_in[exidx,:]
-    viz.show2Dpose( p2d, ax1 )
-    ax1.invert_yaxis()
-
-    # Plot 3d gt
-    ax2 = plt.subplot(gs1[subplot_idx], projection='3d')
-    p3d = dec_out[exidx,:]
-    viz.show3Dpose( p3d, ax2 )
-
-    # Plot 3d predictions
-    ax3 = plt.subplot(gs1[subplot_idx+1], projection='3d')
-    p3d = poses3d[exidx,:]
-    viz.show3Dpose( p3d, ax3 )
-
-    exidx = exidx + 1
-    subplot_idx = subplot_idx + 3
-
-  plt.show()
 
 def main(_):
   if FLAGS.sample:

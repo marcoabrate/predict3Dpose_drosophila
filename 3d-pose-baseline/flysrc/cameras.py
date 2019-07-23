@@ -10,6 +10,7 @@ import matplotlib.image as mpimg
 import data_utils
 import viz
 import readpickle
+import os
 
 def project_point_radial( P, R, T, f, c, k, p ):
   """
@@ -118,7 +119,7 @@ def load_camera_params( dic, ncamera ):
 
   return R, T, intr, d
 
-def load_cameras( bpath='flydata/pose_data_01.pkl' ):
+def load_cameras( data_dir='flydata/' ):
   """Loads the cameras
 
   Args
@@ -127,8 +128,11 @@ def load_cameras( bpath='flydata/pose_data_01.pkl' ):
     rcams: dictionary of 4 tuples per subject ID containing its camera parameters for the 4 h36m cams
   """
   rcams = {}
+  files = [os.path.join(data_dir, f) \
+    for f in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir, f))]
 
-  dic = readpickle.read_data( bpath )
+  for f in files:
+    dic = readpickle.read_data(f)
 
   for c in range(7): # There are 7 cameras
     rcams[c+1] = load_camera_params( dic, c )
