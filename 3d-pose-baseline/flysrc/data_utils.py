@@ -14,14 +14,18 @@ import glob
 import copy
 import sys
 import readpickle
-from random import shuffle
+import random
 
-TRAIN_SUBJECTS = range(0, 900+899)
-TEST_SUBJECTS = range(900+899, 900+899+899)
+random.seed(1743)
+
+DIM_TO_SHUFFLE = list(range(899))
+random.shuffle(DIM_TO_SHUFFLE)
+TRAIN_SUBJECTS = DIM_TO_SHUFFLE[:800]
+TEST_SUBJECTS = DIM_TO_SHUFFLE[800:]
 CAMERA_TO_USE = 2
 
 DIMENSIONS = 38
-ROOT_POSITIONS_DIM = []
+ROOT_POSITIONS_DIM = [0, 5, 10]
 DIMENSIONS_TO_USE = [x for x in range(15) if x not in ROOT_POSITIONS_DIM]
 
 def load_data( data_dir, subjects, dim ):
@@ -41,13 +45,15 @@ def load_data( data_dir, subjects, dim ):
   files = [os.path.join(data_dir, f) \
      for f in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir, f))]
   dics = []
+  files.sort(reverse=False)
   for f in files:
+    print("Reading file {0}".format(f))
     if dim == 3:
       dics.append(readpickle.read_data(f)['points3d'])
     else: # dim == 2
       dics.append(readpickle.read_data(f)['points2d'][CAMERA_TO_USE-1])
   d_data = np.vstack(dics)
-  print('Reading subjects...')
+  print("Done reading data, shape: ", d_data.shape)
 
   for subj in subjects:
     if dim == 3:

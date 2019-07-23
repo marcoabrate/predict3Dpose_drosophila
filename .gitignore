@@ -2,7 +2,7 @@ __pycache__
 
 3d-pose-baseline/flydata
 3d-pose-baseline/data
-3d-pose-baseline/experiments
+3d-pose-baseline/exp*
 *~
 *.pyc
 *.h5

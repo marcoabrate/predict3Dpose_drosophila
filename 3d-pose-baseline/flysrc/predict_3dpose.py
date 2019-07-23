@@ -42,7 +42,7 @@ tf.app.flags.DEFINE_boolean("procrustes", False, "Apply procrustes analysis at t
 
 # Directories
 tf.app.flags.DEFINE_string("data_dir",   "flydata/", "Data directory")
-tf.app.flags.DEFINE_string("train_dir", "flyexperiments", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "exps_fly/", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
@@ -165,6 +165,8 @@ def train():
   print(data_mean_2d)
   print("2D data std:")
   print(data_std_2d)
+  
+  input("Press Enter to continue...")
 
   # Avoid using the GPU if requested
   device_count = {"GPU": 0} if FLAGS.use_cpu else {"GPU": 1}
