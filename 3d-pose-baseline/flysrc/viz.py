@@ -12,7 +12,7 @@ import sys
 import random
 
 COLORS = ["#3498db", "#e74c3c", "#32cd32"]
-TEST_COLORS = ["#5b2c6f", "#212f3c", "#641e16"]
+TEST_COLORS = ["#000099", "#800000", "#006600"]
 
 def show3Dpose(channels, ax, test_colors=False):
   """
@@ -26,7 +26,7 @@ def show3Dpose(channels, ax, test_colors=False):
   Returns
     Nothing. Draws on ax.
   """
-
+  
   vals = channels[0].reshape( (-1, 3) )
   #  vals:
   #  x0  y0  z0
@@ -138,7 +138,9 @@ def visualize_train_sample(train2d, train3d):
   subplot_idx = 1
   camera = data_utils.CAMERA_TO_USE
   nsamples = nrows*ncols
-  for (subj, _) in random.sample(list(train2d.keys()), nsamples):
+  random_subjs = random.sample(list(train2d.keys()), nsamples)
+
+  for (subj, _) in random_subjs:
 
     # Plot 2d pose
     ax1 = plt.subplot(gs1[subplot_idx-1])
@@ -156,6 +158,7 @@ def visualize_train_sample(train2d, train3d):
     subplot_idx += 2
 
   plt.show()
+  return random_subjs
 
 def visualize_test_sample(test2d, test3d, predic):
   # 1080p       = 1,920 x 1,080
@@ -170,8 +173,9 @@ def visualize_test_sample(test2d, test3d, predic):
   subplot_idx = 1
   camera = data_utils.CAMERA_TO_USE
   nsamples = nrows*ncols
-  
-  for subj in np.random.randint(test2d.shape[0], size=(nsamples,)):
+  random_subjs = np.random.randint(test2d.shape[0], size=(nsamples,))  
+
+  for subj in random_subjs:
     # Plot 2d pose
     ax1 = plt.subplot(gs1[subplot_idx-1])
     ax1.set_title("2D pose, subject {0}".format(subj), fontsize=5)
@@ -194,3 +198,4 @@ def visualize_test_sample(test2d, test3d, predic):
     subplot_idx += 3
 
   plt.show()
+  return random_subjs

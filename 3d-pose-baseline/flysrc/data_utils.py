@@ -16,16 +16,17 @@ import sys
 import readpickle
 import random
 
-random.seed(1743)
+random.seed(27)
 
-DIM_TO_SHUFFLE = list(range(899))
-random.shuffle(DIM_TO_SHUFFLE)
-TRAIN_SUBJECTS = DIM_TO_SHUFFLE[:800]
-TEST_SUBJECTS = DIM_TO_SHUFFLE[800:]
+DIM_TO_SHUFFLE = list(range(899*3))
+#random.shuffle(DIM_TO_SHUFFLE)
+TRAIN_DIM = int((2/3)*len(DIM_TO_SHUFFLE))
+TRAIN_SUBJECTS = DIM_TO_SHUFFLE[:TRAIN_DIM]
+TEST_SUBJECTS = DIM_TO_SHUFFLE[TRAIN_DIM:]
 CAMERA_TO_USE = 2
 
 DIMENSIONS = 38
-ROOT_POSITIONS_DIM = [0, 5, 10]
+ROOT_POSITIONS_DIM = []
 DIMENSIONS_TO_USE = [x for x in range(15) if x not in ROOT_POSITIONS_DIM]
 
 def load_data( data_dir, subjects, dim ):
@@ -47,13 +48,13 @@ def load_data( data_dir, subjects, dim ):
   dics = []
   files.sort(reverse=False)
   for f in files:
-    print("Reading file {0}".format(f))
+    print("[*] reading file {0}".format(f))
     if dim == 3:
       dics.append(readpickle.read_data(f)['points3d'])
     else: # dim == 2
       dics.append(readpickle.read_data(f)['points2d'][CAMERA_TO_USE-1])
   d_data = np.vstack(dics)
-  print("Done reading data, shape: ", d_data.shape)
+  print("[+] done reading data, shape: ", d_data.shape)
 
   for subj in subjects:
     if dim == 3:
@@ -270,8 +271,9 @@ def read_3d_data( data_dir, camera_frame, rcams ):
     test_root_positions: dictionary with the 3d positions of the root in test
   """
 
-  print("Dimensions to use: ")
+  print("\n[*] dimensions to use: ")
   print(DIMENSIONS_TO_USE)
+  print()
   # Load 3d data
   train_set = load_data( data_dir, TRAIN_SUBJECTS, dim=3 )
   test_set  = load_data( data_dir, TEST_SUBJECTS, dim=3 )

@@ -42,7 +42,7 @@ tf.app.flags.DEFINE_boolean("procrustes", False, "Apply procrustes analysis at t
 
 # Directories
 tf.app.flags.DEFINE_string("data_dir",   "flydata/", "Data directory")
-tf.app.flags.DEFINE_string("train_dir", "exps_fly/", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "exps_fly_train12_test3_v2/", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
@@ -56,8 +56,8 @@ FLAGS = tf.app.flags.FLAGS
 
 train_dir = FLAGS.train_dir
 
-print( train_dir )
-summaries_dir = os.path.join( train_dir, "log" ) # Directory for TB summaries
+print("\n\n[*] training directory: ", train_dir)
+summaries_dir = os.path.join(train_dir, "log") # Directory for TB summaries
 
 # To avoid race conditions: https://github.com/tensorflow/tensorflow/issues/7448
 os.system('mkdir -p {}'.format(summaries_dir))
@@ -131,8 +131,9 @@ def train():
   full_train_set_2d, full_test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
     data_utils.read_2d_predictions(FLAGS.data_dir)
   
-  print( "done reading and normalizing data." )
+  print("\n[+] done reading and normalizing data")
   print("{0} training subjects, {1} test subjects".format(len(full_train_set_3d), len(full_test_set_3d)))
+  
   viz.visualize_train_sample(
     data_utils.unNormalize_dic(full_train_set_2d, data_mean_2d, data_std_2d, dim_to_use_2d), 
     data_utils.unNormalize_dic(full_train_set_3d, data_mean_3d, data_std_3d, dim_to_use_3d))
@@ -158,7 +159,7 @@ def train():
   print("3D data std:")
   print(data_std_3d)
 
-  print("2D training data (sample):")
+  print("\n2D training data (sample):")
   for k in random.sample(list(train_set_2d.keys()), 3):
     print(train_set_2d[k].shape)
   print("2D data mean:")
@@ -175,10 +176,10 @@ def train():
     allow_soft_placement=True )) as sess:
 
     # === Create the model ===
-    print("Creating %d bi-layers of %d units." % (FLAGS.num_layers, FLAGS.linear_size))
+    print("[*] creating %d bi-layers of %d units." % (FLAGS.num_layers, FLAGS.linear_size))
     model = create_model( sess, FLAGS.batch_size )
     model.train_writer.add_graph( sess.graph )
-    print("Model created")
+    print("[+] model created")
     
     #=== This is the training loop ===
     step_time, loss, val_loss = 0.0, 0.0, 0.0
@@ -195,7 +196,7 @@ def train():
       # === Load training batches for one epoch ===
       encoder_inputs, decoder_outputs = model.get_all_batches( train_set_2d, train_set_3d, FLAGS.camera_frame, training=True )
       nbatches = len( encoder_inputs )
-      print("There are {0} train batches".format( nbatches ))
+      print("[*] there are {0} train batches".format( nbatches ))
       start_time, loss = time.time(), 0.
 
       # === Loop through all the training batches ===
@@ -375,7 +376,7 @@ def sample():
   full_train_set_2d, full_test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
     data_utils.read_2d_predictions(FLAGS.data_dir)
 
-  print( "done reading and normalizing data." )
+  print("[+] done reading and normalizing data")
 
   train_set_2d = {}
   test_set_2d = {}
@@ -392,25 +393,27 @@ def sample():
   
   print("3D test data (sample):")
   for k in random.sample(list(test_set_3d.keys()), 3):
-    print(test_set_3d[k].shape)
-  print("2D test data (sample):")
+    print(test_set_3d[k])
+  print("\n2D test data (sample):")
   for k in random.sample(list(test_set_2d.keys()), 3):
-    print(test_set_2d[k].shape)
+    print(test_set_2d[k])
 
   device_count = {"GPU": 0} if FLAGS.use_cpu else {"GPU": 1}
-  with tf.Session(config=tf.ConfigProto( device_count = device_count )) as sess:
+  with tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(
+    device_count=device_count)) as sess:
+    
     # === Create the model ===
-    print("Creating %d layers of %d units." % (FLAGS.num_layers, FLAGS.linear_size))
+    print("[*] creating %d layers of %d units." % (FLAGS.num_layers, FLAGS.linear_size))
     batch_size = FLAGS.batch_size #128 ???
     # Dropout probability 0 (keep probability 1) for sampling
     dp = 1.0
 
     model = create_model(sess, batch_size)
-    print("Model loaded")
+    print("[+] model loaded")
     encoder_inputs, decoder_outputs = \
       model.get_all_batches( test_set_2d, test_set_3d, FLAGS.camera_frame, training=False)
     nbatches = len( encoder_inputs )
-    print("There are {0} test batches".format( nbatches ))
+    print("[*] there are {0} test batches".format( nbatches ))
     
     all_enc_in = []
     all_dec_out = []
