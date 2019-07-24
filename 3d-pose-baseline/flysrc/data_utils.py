@@ -18,16 +18,16 @@ import random
 
 random.seed(27)
 
-DIM_TO_SHUFFLE = list(range(899*3))
-#random.shuffle(DIM_TO_SHUFFLE)
-TRAIN_DIM = int((2/3)*len(DIM_TO_SHUFFLE))
-TRAIN_SUBJECTS = DIM_TO_SHUFFLE[:TRAIN_DIM]
-TEST_SUBJECTS = DIM_TO_SHUFFLE[TRAIN_DIM:]
-CAMERA_TO_USE = 2
+FILE_DIM = 899
+DIM_TO_READ = list(range(FILE_DIM*3))
+TRAIN_DIM = int((2/3)*len(DIM_TO_READ))
+TRAIN_SUBJECTS = DIM_TO_READ[:TRAIN_DIM]
+TEST_SUBJECTS = DIM_TO_READ[TRAIN_DIM:]
+CAMERA_TO_USE = 1
 
 DIMENSIONS = 38
-ROOT_POSITIONS_DIM = []
-DIMENSIONS_TO_USE = [x for x in range(15) if x not in ROOT_POSITIONS_DIM]
+ROOT_POSITION = -1
+DIMENSIONS_TO_USE = [x for x in range(15) if x != ROOT_POSITION]
 
 def load_data( data_dir, subjects, dim ):
   """
@@ -55,6 +55,8 @@ def load_data( data_dir, subjects, dim ):
       dics.append(readpickle.read_data(f)['points2d'][CAMERA_TO_USE-1])
   d_data = np.vstack(dics)
   print("[+] done reading data, shape: ", d_data.shape)
+  if dim == 3:
+    d_data = change_origin(d_data)
 
   for subj in subjects:
     if dim == 3:
@@ -63,6 +65,17 @@ def load_data( data_dir, subjects, dim ):
       data[ (subj, CAMERA_TO_USE) ] = d_data[subj]
   
   return data
+
+def change_origin(data3d):
+  for coord in range(3):
+    dist = np.mean(data3d[:FILE_DIM,ROOT_POSITION,coord]) -\
+       np.mean(data3d[FILE_DIM:,ROOT_POSITION,coord])
+    data3d[FILE_DIM:,:,coord] += dist
+    #origin = np.mean(data3d[:,ROOT_POSITION,coord])
+    #data3d[:,:,coord] -= origin
+    #data3d[:,ROOT_POSITION,coord] = 0
+
+  return data3d
 
 def normalization_stats(complete_data, dim ):
   """
@@ -95,7 +108,7 @@ def normalization_stats(complete_data, dim ):
   return data_mean, data_std, dimensions_to_ignore, dimensions_to_use
 
 
-def transform_world_to_camera(poses_set, cams, ncams=7 ):
+def transform_world_to_camera(poses_set, rcams):
     """
     Project 3d poses from world coordinate to camera coordinate system
     Args
@@ -107,16 +120,15 @@ def transform_world_to_camera(poses_set, cams, ncams=7 ):
         with 3d poses in camera coordinate
     """
     t3d_camera = {}
-    for subj in sorted( poses_set.keys() ):
+    for key in sorted( poses_set.keys() ):
+      (subj, _) = key
+      t3d_world = poses_set[ key ]
 
-      t3d_world = poses_set[ subj ]
+      R, T, f, ce, d = rcams[ CAMERA_TO_USE ]
+      camera_coord = cameras.world_to_camera_frame( t3d_world, R, T )
+      camera_coord = np.reshape( camera_coord, (-1, DIMENSIONS*3) )
 
-      for c in range( ncams ):
-        R, T, intr, d = cams[ c+1 ]
-        camera_coord = cameras.world_to_camera_frame( t3d_world, R, T )
-        #camera_coord = np.reshape( camera_coord, [-1, len(H36M_NAMES)*3] )
-
-        t3d_camera[ (subj, c+1) ] = camera_coord
+      t3d_camera[ (subj, CAMERA_TO_USE) ] = camera_coord
     
     return t3d_camera
 

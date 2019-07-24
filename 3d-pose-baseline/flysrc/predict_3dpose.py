@@ -24,7 +24,7 @@ import cameras
 import data_utils
 import linear_model
 
-tf.app.flags.DEFINE_float("learning_rate", 1e-3, "Learning rate")
+tf.app.flags.DEFINE_float("learning_rate", 1e-5, "Learning rate")
 tf.app.flags.DEFINE_float("dropout", 1, "Dropout keep probability. 1 means no dropout")
 tf.app.flags.DEFINE_integer("batch_size", 64, "Batch size to use during training")
 tf.app.flags.DEFINE_integer("epochs", 200, "How many epochs we should train for")
@@ -42,7 +42,7 @@ tf.app.flags.DEFINE_boolean("procrustes", False, "Apply procrustes analysis at t
 
 # Directories
 tf.app.flags.DEFINE_string("data_dir",   "flydata/", "Data directory")
-tf.app.flags.DEFINE_string("train_dir", "exps_fly_train12_test3_v2/", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "exps_fly_train12_test3_camproj/", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
@@ -133,10 +133,10 @@ def train():
   
   print("\n[+] done reading and normalizing data")
   print("{0} training subjects, {1} test subjects".format(len(full_train_set_3d), len(full_test_set_3d)))
-  
   viz.visualize_train_sample(
     data_utils.unNormalize_dic(full_train_set_2d, data_mean_2d, data_std_2d, dim_to_use_2d), 
-    data_utils.unNormalize_dic(full_train_set_3d, data_mean_3d, data_std_3d, dim_to_use_3d))
+    data_utils.unNormalize_dic(full_train_set_3d, data_mean_3d, data_std_3d, dim_to_use_3d),
+    FLAGS.camera_frame)
   
   train_set_2d = {}
   test_set_2d = {}
@@ -145,11 +145,13 @@ def train():
   for k in full_train_set_3d:
     (subj, c) = k
     train_set_3d[k] = full_train_set_3d[k][:, dim_to_use_3d]
-    train_set_2d[(subj, 2)] = full_train_set_2d[(subj, 2)][:, dim_to_use_2d]
+    train_set_2d[(subj, data_utils.CAMERA_TO_USE)] =\
+       full_train_set_2d[(subj, data_utils.CAMERA_TO_USE)][:, dim_to_use_2d]
   for k in full_test_set_3d:
     (subj, c) = k
     test_set_3d[k] = full_test_set_3d[k][:, dim_to_use_3d]
-    test_set_2d[(subj, 2)] = full_test_set_2d[(subj, 2)][:, dim_to_use_2d]
+    test_set_2d[(subj, data_utils.CAMERA_TO_USE)] =\
+       full_test_set_2d[(subj, data_utils.CAMERA_TO_USE)][:, dim_to_use_2d]
 
   print("3D training data (sample):")
   for k in random.sample(list(train_set_3d.keys()), 3):
@@ -194,7 +196,8 @@ def train():
       current_epoch = current_epoch + 1
 
       # === Load training batches for one epoch ===
-      encoder_inputs, decoder_outputs = model.get_all_batches( train_set_2d, train_set_3d, FLAGS.camera_frame, training=True )
+      encoder_inputs, decoder_outputs =\
+         model.get_all_batches( train_set_2d, train_set_3d, FLAGS.camera_frame, training=True )
       nbatches = len( encoder_inputs )
       print("[*] there are {0} train batches".format( nbatches ))
       start_time, loss = time.time(), 0.
@@ -207,7 +210,8 @@ def train():
           print("Working on epoch {0}, batch {1} / {2}...".format( current_epoch, i+1, nbatches),end="" )
 
         enc_in, dec_out = encoder_inputs[i], decoder_outputs[i]
-        step_loss, loss_summary, lr_summary, _ =  model.step( sess, enc_in, dec_out, FLAGS.dropout, isTraining=True )
+        step_loss, loss_summary, lr_summary, _ =\
+          model.step( sess, enc_in, dec_out, FLAGS.dropout, isTraining=True )
 
         if (i+1) % log_every_n_batches == 0:
           # Log and print progress every log_every_n_batches batches
@@ -234,7 +238,8 @@ def train():
       isTraining = False
 
       n_joints = len(data_utils.DIMENSIONS_TO_USE)
-      encoder_inputs, decoder_outputs = model.get_all_batches( test_set_2d, test_set_3d, FLAGS.camera_frame, training=False)
+      encoder_inputs, decoder_outputs =\
+         model.get_all_batches( test_set_2d, test_set_3d, FLAGS.camera_frame, training=False)
 
       total_err, joint_err, step_time, loss = evaluate_batches( sess, model,
         data_mean_3d, data_std_3d, dim_to_use_3d, dim_to_ignore_3d,
@@ -410,7 +415,7 @@ def sample():
 
     model = create_model(sess, batch_size)
     print("[+] model loaded")
-    encoder_inputs, decoder_outputs = \
+    encoder_inputs, decoder_outputs =\
       model.get_all_batches( test_set_2d, test_set_3d, FLAGS.camera_frame, training=False)
     nbatches = len( encoder_inputs )
     print("[*] there are {0} test batches".format( nbatches ))

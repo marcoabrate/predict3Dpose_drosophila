@@ -68,8 +68,9 @@ def world_to_camera_frame(P, R, T):
 
   assert len(P.shape) == 2
   assert P.shape[1] == 3
-
-  X_cam = R.dot( P.T - T ) # rotate and translate
+  
+  trans = P.T - np.repeat(T, data_utils.DIMENSIONS, axis=1)
+  X_cam = R.dot(trans) # rotate and translate
 
   return X_cam.T
 
@@ -101,23 +102,21 @@ def load_camera_params( dic, ncamera ):
     R: 3x3 Camera rotation matrix
     T: 3x1 Camera translation parameters
     f: (scalar) Camera focal length
-    c: 2x1 Camera center
-    intr: 3x3 ???
+    ce: 2x1 Camera center
     d: 6x1 Camera distortion coefficients
-    name: String with camera id
   """
   
   c = dic[ncamera]
   R = c['R']
   R = R.T
   
-  T = c['tvec']
-  #f = ???
-  #c = ???
+  T = c['tvec'].reshape((-1,1))
   intr = c['intr']
+  f = (intr[0,0]+intr[1,1])/2
+  ce = intr[:2,2]
   d = c['distort']
 
-  return R, T, intr, d
+  return R, T, f, ce, d
 
 def load_cameras( data_dir='flydata/' ):
   """Loads the cameras

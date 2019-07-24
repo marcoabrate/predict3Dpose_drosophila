@@ -87,7 +87,8 @@ class LinearModel(object):
     self.global_step   = tf.Variable(0, trainable=False, name="global_step")
     decay_steps = 100000  # empirical
     decay_rate = 0.96     # empirical
-    self.learning_rate = tf.compat.v1.train.exponential_decay(self.learning_rate, self.global_step, decay_steps, decay_rate)
+    self.learning_rate =  tf.compat.v1.train.exponential_decay(
+      self.learning_rate, self.global_step, decay_steps, decay_rate)
 
     # === Transform the inputs ===
     with vs.variable_scope("inputs"):
@@ -272,8 +273,10 @@ class LinearModel(object):
     idx = 0
     for key2d in data_x.keys():
       (subj, camera) = key2d
-      key3d = (subj, 0)      
-
+      if not camera_frame:
+        key3d = (subj, 0)
+      else:
+        key3d = (subj, data_utils.CAMERA_TO_USE)
       n2d, _ = data_x[ key2d ].shape
       encoder_inputs[idx:idx+n2d, :]  = data_x[ key2d ]
       decoder_outputs[idx:idx+n2d, :] = data_y[ key3d ]

@@ -125,7 +125,7 @@ def show2Dpose(channels, ax):
 
   ax.set_aspect('equal')
 
-def visualize_train_sample(train2d, train3d):
+def visualize_train_sample(train2d, train3d, camera_frame):
   # 1080p       = 1,920 x 1,080
   fig = plt.figure( figsize=(19.2, 10.8) )
   
@@ -152,7 +152,10 @@ def visualize_train_sample(train2d, train3d):
     # Plot 3d pose
     ax2 = plt.subplot(gs1[subplot_idx], projection='3d')
     ax2.set_title("3D pose, subject {0}".format(subj), fontsize=5)
-    p3d = train3d[ (subj, 0) ]
+    if not camera_frame:
+      p3d = train3d[ (subj, 0) ]
+    else:
+      p3d = train3d[ (subj, camera) ]
     show3Dpose( p3d, ax2 )
 
     subplot_idx += 2
