@@ -3,6 +3,7 @@
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.animation as animation
 import data_utils
 import numpy as np
 import h5py
@@ -115,13 +116,8 @@ def show2Dpose(channels, ax):
   ax.get_xaxis().set_ticklabels([])
   ax.get_yaxis().set_ticklabels([])
 
-  #RADIUS = 350 # space around the subject
-  #xroot, yroot = vals[0,0], vals[0,1]
-  #ax.set_xlim([-RADIUS+xroot, RADIUS+xroot])
-  #ax.set_ylim([-RADIUS+yroot, RADIUS+yroot])
   ax.set_xlim(0, 960)
   ax.set_ylim(0, 480)
-
 
   ax.set_aspect('equal')
 
@@ -132,11 +128,12 @@ def visualize_train_sample(train2d, train3d, camera_frame):
   nrows = 3
   ncols = 2
   gs1 = gridspec.GridSpec(nrows, ncols*2)
-  gs1.update(wspace=-0.00, hspace=0.05) # set the spacing between axes.
+  gs1.update(wspace=-0.00, hspace=0.05) # set the spacing between axes
   plt.axis('off')
 
   subplot_idx = 1
   camera = data_utils.CAMERA_TO_USE
+  projcamera = data_utils.PROJECT_CAMERA
   nsamples = nrows*ncols
   random_subjs = random.sample(list(train2d.keys()), nsamples)
 
@@ -148,15 +145,19 @@ def visualize_train_sample(train2d, train3d, camera_frame):
     p2d = train2d[ (subj, camera) ] 
     show2Dpose( p2d, ax1 )
     ax1.invert_yaxis()
-
-    # Plot 3d pose
-    ax2 = plt.subplot(gs1[subplot_idx], projection='3d')
-    ax2.set_title("3D pose, subject {0}".format(subj), fontsize=5)
+    
     if not camera_frame:
+      # Plot 3d pose
+      ax2 = plt.subplot(gs1[subplot_idx], projection='3d')
+      ax2.set_title("3D pose, subject {0}".format(subj), fontsize=5)
       p3d = train3d[ (subj, 0) ]
+      show3Dpose( p3d, ax2 ) 
     else:
-      p3d = train3d[ (subj, camera) ]
-    show3Dpose( p3d, ax2 )
+      # Plot projected 3d pose
+      ax2 = plt.subplot(gs1[subplot_idx], projection='3d')
+      ax2.set_title("projected 3D pose, subject {0}".format(subj), fontsize=5)
+      p3d = train3d[ (subj, projcamera) ]
+      show3Dpose( p3d, ax2 )
 
     subplot_idx += 2
 
@@ -202,3 +203,71 @@ def visualize_test_sample(test2d, test3d, predic):
 
   plt.show()
   return random_subjs
+
+def update_graph(num, test2d, test3d, predic, ax2d, ax3d):
+  ax2d.cla()
+  ax3d.cla()
+  ax2d.set_title("2D pose")
+  ax3d.set_title("prediction in RED {0}".format(num))
+  channels = [test3d[num].reshape((1,-1)), predic[num].reshape((1,-1))]
+  get_3d_pose(channels, ax3d)
+  get_2d_pose(test2d[num].reshape((1,-1)), ax2d)
+
+def visualize_animation(test2d, test3d, predic):
+  fig = plt.figure()
+  ax2d = fig.add_subplot(121)
+  ax3d = fig.add_subplot(122, projection='3d')
+  
+  ax2d.set_title("2D pose")
+  ax3d.set_title("prediction in RED 0")
+  channels = [test3d[0].reshape((1,-1)), predic[0].reshape((1,-1))]
+  get_3d_pose(channels, ax3d)
+  get_2d_pose(test2d[0].reshape((1,-1)), ax2d)
+
+  ani = animation.FuncAnimation(fig, update_graph, test3d.shape[0],
+    fargs=(test2d, test3d, predic, ax2d, ax3d), interval=100, blit=False)
+  Writer = animation.writers['ffmpeg']
+  writer = Writer(fps=15, bitrate=1800)
+  #ani.save('predictions.mp4', writer=writer)
+  plt.show()
+
+def get_3d_pose(channels, ax):
+  I  = np.array([0,1,2,3,5,6,7,8,10,11,12,13]) # start points
+  J  = np.array([1,2,3,4,6,7,8,9,11,12,13,14]) # end points
+  cidx = 0
+  colors = ["#004100", "#009600", "#00ff00", "#410000", "#960000", "#ff0000"]
+  for ch in channels:
+    vals = ch.reshape((-1, 3))
+    for i in np.arange(len(I)):
+      x, z, y = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
+      y *= -1
+      z *= -1
+      ax.plot(x, y, z, lw=2, c=colors[cidx])
+      if (i+1)%4 == 0:
+        cidx+=1
+
+def get_2d_pose(channel, ax):
+  vals = channel.reshape((-1, 2))  
+
+  I  = np.array([0,1,2,3,5,6,7,8,10,11,12,13]) # start points
+  J  = np.array([1,2,3,4,6,7,8,9,11,12,13,14]) # end points
+  cidx = 0
+
+  # Make connection matrix
+  for i in np.arange( len(I) ):
+    x, y = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(2)]
+    ax.plot(x, y, lw=2, c=COLORS[cidx])
+    if (i+1)%4 == 0:
+      cidx += 1
+
+  # Get rid of the ticks
+  ax.set_xticks([])
+  ax.set_yticks([])
+  # Get rid of tick labels
+  ax.get_xaxis().set_ticklabels([])
+  ax.get_yaxis().set_ticklabels([])
+  ax.set_xlim(0, 960)
+  ax.set_ylim(0, 480)
+
+  ax.set_aspect('equal')
+  ax.invert_yaxis()

@@ -24,7 +24,7 @@ import cameras
 import data_utils
 import linear_model
 
-tf.app.flags.DEFINE_float("learning_rate", 1e-5, "Learning rate")
+tf.app.flags.DEFINE_float("learning_rate", 1e-3, "Learning rate")
 tf.app.flags.DEFINE_float("dropout", 1, "Dropout keep probability. 1 means no dropout")
 tf.app.flags.DEFINE_integer("batch_size", 64, "Batch size to use during training")
 tf.app.flags.DEFINE_integer("epochs", 200, "How many epochs we should train for")
@@ -42,7 +42,7 @@ tf.app.flags.DEFINE_boolean("procrustes", False, "Apply procrustes analysis at t
 
 # Directories
 tf.app.flags.DEFINE_string("data_dir",   "flydata/", "Data directory")
-tf.app.flags.DEFINE_string("train_dir", "exps_fly_train12_test3_camproj/", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "tr12te3_superimp_neworig", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
@@ -192,7 +192,7 @@ def train():
     current_epoch = 0
     log_every_n_batches = 20
 
-    for _ in xrange( FLAGS.epochs ):
+    for _ in range( FLAGS.epochs ):
       current_epoch = current_epoch + 1
 
       # === Load training batches for one epoch ===
@@ -382,7 +382,7 @@ def sample():
     data_utils.read_2d_predictions(FLAGS.data_dir)
 
   print("[+] done reading and normalizing data")
-
+  
   train_set_2d = {}
   test_set_2d = {}
   train_set_3d = {}
@@ -440,34 +440,19 @@ def sample():
     
     # Convert back to world coordinates
     if FLAGS.camera_frame:
-      N_CAMERAS = 7
-      N_JOINTS_H36M = 32
-
-      # Add global position back
-      dec_out = dec_out + np.tile( test_root_positions[ key3d ], [1,N_JOINTS_H36M] )
-
-      # Load the appropriate camera
-      subj, _, sname = key3d
-
-      cname = sname.split('.')[1] # <-- camera name
-      scams = {(subj,c+1): rcams[(subj,c+1)] for c in range(N_CAMERAS)} # cams of this subject
-      scam_idx = [scams[(subj,c+1)][-1] for c in range(N_CAMERAS)].index( cname ) # index of camera used
-      the_cam  = scams[(subj, scam_idx+1)] # <-- the camera used
-      R, T, f, c, k, p, name = the_cam
-      assert name == cname
+      R, T, f, ce, d, intr = rcams[data_utils.PROJECT_CAMERA]
 
       def cam2world_centered(data_3d_camframe):
         data_3d_worldframe = cameras.camera_to_world_frame(data_3d_camframe.reshape((-1, 3)), R, T)
-        data_3d_worldframe = data_3d_worldframe.reshape((-1, N_JOINTS_H36M*3))
-        # subtract root translation
-        return data_3d_worldframe - np.tile( data_3d_worldframe[:,:3], (1,N_JOINTS_H36M) )
+        data_3d_worldframe = data_3d_worldframe.reshape((-1, data_utils.DIMENSIONS*3))
+        return data_3d_worldframe
 
       # Apply inverse rotation and translation
       dec_out = cam2world_centered(dec_out)
       poses3d = cam2world_centered(poses3d)
-
+    
     viz.visualize_test_sample(enc_in, dec_out, poses3d)
-
+    viz.visualize_animation(enc_in, dec_out, poses3d)
 
 def main(_):
   if FLAGS.sample:

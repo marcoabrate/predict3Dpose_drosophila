@@ -21,12 +21,15 @@ random.seed(27)
 FILE_DIM = 899
 DIM_TO_READ = list(range(FILE_DIM*3))
 TRAIN_DIM = int((2/3)*len(DIM_TO_READ))
+
 TRAIN_SUBJECTS = DIM_TO_READ[:TRAIN_DIM]
 TEST_SUBJECTS = DIM_TO_READ[TRAIN_DIM:]
-CAMERA_TO_USE = 1
+
+CAMERA_TO_USE = 2
+PROJECT_CAMERA = 2
 
 DIMENSIONS = 38
-ROOT_POSITION = -1
+ROOT_POSITION = 0
 DIMENSIONS_TO_USE = [x for x in range(15) if x != ROOT_POSITION]
 
 def load_data( data_dir, subjects, dim ):
@@ -55,8 +58,8 @@ def load_data( data_dir, subjects, dim ):
       dics.append(readpickle.read_data(f)['points2d'][CAMERA_TO_USE-1])
   d_data = np.vstack(dics)
   print("[+] done reading data, shape: ", d_data.shape)
-  if dim == 3:
-    d_data = change_origin(d_data)
+  #if dim == 3:
+  #  d_data = change_origin(d_data)
 
   for subj in subjects:
     if dim == 3:
@@ -71,9 +74,9 @@ def change_origin(data3d):
     dist = np.mean(data3d[:FILE_DIM,ROOT_POSITION,coord]) -\
        np.mean(data3d[FILE_DIM:,ROOT_POSITION,coord])
     data3d[FILE_DIM:,:,coord] += dist
-    #origin = np.mean(data3d[:,ROOT_POSITION,coord])
-    #data3d[:,:,coord] -= origin
-    #data3d[:,ROOT_POSITION,coord] = 0
+    origin = np.mean(data3d[:,ROOT_POSITION,coord])
+    data3d[:,:,coord] -= origin
+    data3d[:,ROOT_POSITION,coord] = 0
 
   return data3d
 
@@ -123,12 +126,12 @@ def transform_world_to_camera(poses_set, rcams):
     for key in sorted( poses_set.keys() ):
       (subj, _) = key
       t3d_world = poses_set[ key ]
-
-      R, T, f, ce, d = rcams[ CAMERA_TO_USE ]
-      camera_coord = cameras.world_to_camera_frame( t3d_world, R, T )
+      
+      R, T, f, ce, d, intr = rcams[ PROJECT_CAMERA ]
+      camera_coord = cameras.world_to_camera_frame( t3d_world, R, T, intr )
       camera_coord = np.reshape( camera_coord, (-1, DIMENSIONS*3) )
 
-      t3d_camera[ (subj, CAMERA_TO_USE) ] = camera_coord
+      t3d_camera[ (subj, PROJECT_CAMERA) ] = camera_coord
     
     return t3d_camera
 
@@ -293,11 +296,8 @@ def read_3d_data( data_dir, camera_frame, rcams ):
   if camera_frame:
     train_set = transform_world_to_camera( train_set, rcams )
     test_set  = transform_world_to_camera( test_set, rcams )
-    print("CAMERA_FRAME")
 
   # Apply 3d post-processing (centering around root)
-  #train_set, train_root_positions = postprocess_3d( train_set )
-  #test_set,  test_root_positions  = postprocess_3d( test_set )
   train_root_positions = [0, 0, 0]
   test_root_positions = [0, 0, 0]
   # Compute normalization statistics
@@ -310,26 +310,3 @@ def read_3d_data( data_dir, camera_frame, rcams ):
   test_set  = normalize_data( test_set,  data_mean, data_std, dim_to_use, dim=3 )
   
   return train_set, test_set, data_mean, data_std, dim_to_ignore, dim_to_use, train_root_positions, test_root_positions
-
-
-def postprocess_3d( poses_set ):
-  """
-  Center 3d points around root
-
-  Args
-    poses_set: dictionary with 3d data
-  Returns
-    poses_set: dictionary with 3d data centred around root (center hip) joint
-    root_positions: dictionary with the original 3d position of each pose
-  """
-  root_positions = {}
-  for k in poses_set.keys():
-    # Keep track of the global position
-    root_positions[k] = np.copy(poses_set[k][ROOT_POSITIONS_DIM])
-    
-    # Remove the root from the 3d position
-    poses = poses_set[k]
-    poses = poses - np.tile( poses[0], (poses.shape[0], 1) )
-    poses_set[k] = poses
-
-  return poses_set, root_positions

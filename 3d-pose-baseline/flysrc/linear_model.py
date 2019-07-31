@@ -276,7 +276,7 @@ class LinearModel(object):
       if not camera_frame:
         key3d = (subj, 0)
       else:
-        key3d = (subj, data_utils.CAMERA_TO_USE)
+        key3d = (subj, data_utils.PROJECT_CAMERA)
       n2d, _ = data_x[ key2d ].shape
       encoder_inputs[idx:idx+n2d, :]  = data_x[ key2d ]
       decoder_outputs[idx:idx+n2d, :] = data_y[ key3d ]

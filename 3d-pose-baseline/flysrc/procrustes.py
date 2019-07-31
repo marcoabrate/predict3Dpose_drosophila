@@ -1,63 +1,138 @@
+import numpy as np
+import glob
+import os
+import data_utils
+#import deepfly.GUI.skeleton.skeleton_fly as skeleton
+body_coxa_idx = data_utils.DIMENSIONS_TO_USE#[j for j in range(skeleton.num_joints) if skeleton.is_tracked_point(j, skeleton.Tracked.BODY_COXA)]
 
-def compute_similarity_transform(X, Y, compute_optimal_scale=False):
-  """
-  A port of MATLAB's `procrustes` function to Numpy.
-  Adapted from http://stackoverflow.com/a/18927641/1884420
 
-  Args
-    X: array NxM of targets, with N number of points and M point dimensionality
-    Y: array NxM of inputs
-    compute_optimal_scale: whether we compute optimal scale or force it to be 1
+def apply_transformation(pts, R=None, t=None, s=None):
+    return s * np.dot(pts, R) + t
 
-  Returns:
-    d: squared error after transformation
-    Z: transformed Y
-    T: computed rotation
-    b: scaling
-    c: translation
-  """
-  import numpy as np
 
-  muX = X.mean(0)
-  muY = Y.mean(0)
+def procrustes(pts ,template, reflection=True):
+    template_bc = template[:,body_coxa_idx]
+    pts_bc = pts[:,body_coxa_idx]
 
-  X0 = X - muX
-  Y0 = Y - muY
+    template_bc = np.median(template_bc, axis=0)
+    pts_bc = np.median(pts_bc, axis=0)
 
-  ssX = (X0**2.).sum()
-  ssY = (Y0**2.).sum()
+    d, Z, tform = procrustes_(template_bc, pts_bc, reflection=reflection)
+    R_b, s_b, t_b = tform["rotation"], tform["scale"], tform["translation"]
 
-  # centred Frobenius norm
-  normX = np.sqrt(ssX)
-  normY = np.sqrt(ssY)
+    pts_t = apply_transformation(pts.copy(), R_b, t_b, s_b)
+    
+    return pts_t, tform
 
-  # scale to equal (unit) norm
-  X0 = X0 / normX
-  Y0 = Y0 / normY
 
-  # optimum rotation matrix of Y
-  A = np.dot(X0.T, Y0)
-  U,s,Vt = np.linalg.svd(A,full_matrices=False)
-  V = Vt.T
-  T = np.dot(V, U.T)
+def procrustes_(X, Y, scaling=True, reflection='best'):
+    """
+    A port of MATLAB's `procrustes` function to Numpy.
 
-  # Make sure we have a rotation
-  detT = np.linalg.det(T)
-  V[:,-1] *= np.sign( detT )
-  s[-1]   *= np.sign( detT )
-  T = np.dot(V, U.T)
+    Procrustes analysis determines a linear transformation (translation,
+    reflection, orthogonal rotation and scaling) of the points in Y to best
+    conform them to the points in matrix X, using the sum of squared errors
+    as the goodness of fit criterion.
 
-  traceTA = s.sum()
+        d, Z, [tform] = procrustes(X, Y)
 
-  if compute_optimal_scale:  # Compute optimum scaling of Y.
-    b = traceTA * normX / normY
-    d = 1 - traceTA**2
-    Z = normX*traceTA*np.dot(Y0, T) + muX
-  else:  # If no scaling allowed
-    b = 1
-    d = 1 + ssY/ssX - 2 * traceTA * normY / normX
-    Z = normY*np.dot(Y0, T) + muX
+    Inputs:
+    ------------
+    X, Y    
+        matrices of target and input coordinates. they must have equal
+        numbers of  points (rows), but Y may have fewer dimensions
+        (columns) than X.
 
-  c = muX - b*np.dot(muY, T)
+    scaling 
+        if False, the scaling component of the transformation is forced
+        to 1
 
-  return d, Z, T, b, c
+    reflection
+        if 'best' (default), the transformation solution may or may not
+        include a reflection component, depending on which fits the data
+        best. setting reflection to True or False forces a solution with
+        reflection or no reflection respectively.
+
+    Outputs
+    ------------
+    d       
+        the residual sum of squared errors, normalized according to a
+        measure of the scale of X, ((X - X.mean(0))**2).sum()
+
+    Z
+        the matrix of transformed Y-values
+
+    tform   
+        a dict specifying the rotation, translation and scaling that
+        maps X --> Y
+
+    """
+
+    n,m = X.shape
+    ny,my = Y.shape
+
+    muX = X.mean(0)
+    muY = Y.mean(0)
+
+    X0 = X - muX
+    Y0 = Y - muY
+
+    ssX = (X0**2.).sum()
+    ssY = (Y0**2.).sum()
+
+    # centred Frobenius norm
+    normX = np.sqrt(ssX)
+    normY = np.sqrt(ssY)
+
+    # scale to equal (unit) norm
+    X0 /= normX
+    Y0 /= normY
+
+    if my < m:
+        Y0 = np.concatenate((Y0, np.zeros(n, m-my)),0)
+
+    # optimum rotation matrix of Y
+    A = np.dot(X0.T, Y0)
+    U,s,Vt = np.linalg.svd(A,full_matrices=False)
+    V = Vt.T
+    T = np.dot(V, U.T)
+
+    if reflection is not 'best':
+
+        # does the current solution use a reflection?
+        have_reflection = np.linalg.det(T) < 0
+
+        # if that's not what was specified, force another reflection
+        if reflection != have_reflection:
+            V[:,-1] *= -1
+            s[-1] *= -1
+            T = np.dot(V, U.T)
+
+    traceTA = s.sum()
+
+    if scaling:
+
+        # optimum scaling of Y
+        b = traceTA * normX / normY
+
+        # standarised distance between X and b*Y*T + c
+        d = 1 - traceTA**2
+
+        # transformed coords
+        Z = normX*traceTA*np.dot(Y0, T) + muX
+
+    else:
+        b = 1
+        d = 1 + ssY/ssX - 2 * traceTA * normY / normX
+        Z = normY*np.dot(Y0, T) + muX
+
+    # transformation matrix
+    if my < m:
+        T = T[:my,:]
+    c = muX - b*np.dot(muY, T)
+
+    #transformation values 
+    tform = {'rotation':T, 'scale':b, 'translation':c}
+
+    return d, Z, tform
+

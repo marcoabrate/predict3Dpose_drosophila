@@ -54,7 +54,7 @@ def project_point_radial( P, R, T, f, c, k, p ):
 
   return Proj, D, radial, tan, r2
 
-def world_to_camera_frame(P, R, T):
+def world_to_camera_frame(P, R, T, intr):
   """
   Convert points from world to camera coordinates
 
@@ -69,8 +69,7 @@ def world_to_camera_frame(P, R, T):
   assert len(P.shape) == 2
   assert P.shape[1] == 3
   
-  trans = P.T - np.repeat(T, data_utils.DIMENSIONS, axis=1)
-  X_cam = R.dot(trans) # rotate and translate
+  X_cam = R.dot(P.T - T) # rotate and translate
 
   return X_cam.T
 
@@ -116,7 +115,7 @@ def load_camera_params( dic, ncamera ):
   ce = intr[:2,2]
   d = c['distort']
 
-  return R, T, f, ce, d
+  return R, T, f, ce, d, intr
 
 def load_cameras( data_dir='flydata/' ):
   """Loads the cameras

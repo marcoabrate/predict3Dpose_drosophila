@@ -1,10 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import mpl_toolkits.mplot3d.axes3d as p3
 import matplotlib.animation as animation
 
 import data_utils
 import viz
+import procrustes
 import sys
 
 data_dir = "flydata/"
@@ -52,9 +52,9 @@ def get_3d_pose(channels, ax):
   
 def update_graph(num, data3d, ax):
   plt.cla()
-  ax.set_xlim3d([-2, 2])
-  ax.set_ylim3d([-2, 2])
-  ax.set_zlim3d([-2, 0])
+#  ax.set_xlim3d([-2, 2])
+#  ax.set_ylim3d([-2, 2])
+#  ax.set_zlim3d([-2, 0])
   ax.set_title("3D Test, time={0}".format(num))
   channels = [data3d[num].reshape((-1,1)), data3d[FILE_DIM+num].reshape((-1,1)),\
     data3d[2*FILE_DIM+num].reshape((-1,1))]
@@ -65,7 +65,27 @@ data2d = data_utils.load_data(data_dir, subjects, dim=2)
 data3d = data_utils.load_data(data_dir, subjects, dim=3)
 data2d = np.copy(np.vstack(list(data2d.values())).reshape((-1, data_utils.DIMENSIONS, 2)))
 data3d = np.copy(np.vstack(list(data3d.values())).reshape((-1, data_utils.DIMENSIONS, 3)))
-data3d = change_origin(data3d)
+
+t = 1
+s = 2
+R = np.array([[0,1,0],
+              [1,0,0],
+              [0,0,1]])
+
+pts = procrustes.apply_transformation(data3d.copy(), R, t, s)
+pts_t, d = procrustes.procrustes(pts, data3d)
+k = 0
+for i in range(data3d.shape[0]):
+  if False in np.isclose(data3d[i], pts_t[i]):
+    print(data3d[i])
+    print(pts_t[i])
+    print("---------")
+    k += 1
+  if k > 5:
+    break
+print(k)
+data3d = pts_t
+
 print("\n[+] done reading data")
 print(data2d.shape, data3d.shape)
 
@@ -73,9 +93,9 @@ pdata3d = np.copy(data3d.reshape((-1, data_utils.DIMENSIONS*3)))
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 title = ax.set_title('3D Test')
-ax.set_xlim3d([-3.5, 3.5])
-ax.set_ylim3d([-1.8, 3.6])
-ax.set_zlim3d([0.2, 2.5])
+#ax.set_xlim3d([-3.5, 3.5])
+#ax.set_ylim3d([-1.8, 3.6])
+#ax.set_zlim3d([0.2, 2.5])
 channels = [pdata3d[0].reshape((-1,1)), pdata3d[FILE_DIM].reshape((-1,1)),\
    pdata3d[2*FILE_DIM].reshape((-1,1))]
 get_3d_pose(channels, ax) 
@@ -83,6 +103,9 @@ get_3d_pose(channels, ax)
 ani = animation.FuncAnimation(
   fig, update_graph, FILE_DIM, fargs=(pdata3d, ax), interval=10, blit=False)
 
+Writer = animation.writers['ffmpeg']
+writer = Writer(fps=15, bitrate=1800)
+#ani.save('compare.mp4', writer=writer)
 plt.show()
 
 for i in range(1, file_num+1):
