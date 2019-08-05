@@ -39,6 +39,7 @@ class LinearModel(object):
                max_norm,
                batch_size,
                learning_rate,
+               change_origin,
                summaries_dir,
                dtype=tf.float32):
     """Creates the linear + relu model
@@ -60,7 +61,10 @@ class LinearModel(object):
     # compatible (e.g. you can train on ground truth 2d and test on SH detections).
     # This does not seem to have an effect on prediction performance.
     #self.HUMAN_2D_SIZE = 16 * 2
-    self.FLY_2D_SIZE = len(data_utils.DIMENSIONS_TO_USE) * 2
+    if not change_origin:
+      self.FLY_2D_SIZE = len(data_utils.DIMENSIONS_TO_USE) * 2
+    else:
+      self.FLY_2D_SIZE = (len(data_utils.DIMENSIONS_TO_USE)-1) * 2
 
     # In 3d all the predictions are zero-centered around the root (hip) joint, so
     # we actually predict only 16 joints. The error is still computed over 17 joints,
@@ -69,7 +73,10 @@ class LinearModel(object):
     # There is also an option to predict only 14 joints, which makes our results
     # directly comparable to those in https://arxiv.org/pdf/1611.09010.pdf
     #self.HUMAN_3D_SIZE = 14 * 3 if predict_14 else 16 * 3
-    self.FLY_3D_SIZE = len(data_utils.DIMENSIONS_TO_USE) * 3
+    if not change_origin:
+      self.FLY_3D_SIZE = len(data_utils.DIMENSIONS_TO_USE) * 3
+    else:
+      self.FLY_3D_SIZE = (len(data_utils.DIMENSIONS_TO_USE)-1) * 3
 
     self.input_size  = self.FLY_2D_SIZE
     self.output_size = self.FLY_3D_SIZE
@@ -254,7 +261,6 @@ class LinearModel(object):
       data_y: dictionary with 3d expected outputs
       camera_frame: whether the 3d data is in camera coordinates
       training: True if this is a training batch. False otherwise.
-
     Returns
       encoder_inputs: list of 2d batches
       decoder_outputs: list of 3d batches
@@ -272,16 +278,16 @@ class LinearModel(object):
     # Put all the data into big arrays
     idx = 0
     for key2d in data_x.keys():
-      (subj, camera) = key2d
+      (f, camera) = key2d
       if not camera_frame:
-        key3d = (subj, 0)
+        key3d = (f, 0)
       else:
-        key3d = (subj, data_utils.PROJECT_CAMERA)
+        key3d = (f, data_utils.CAMERA_PROJ)
       n2d, _ = data_x[ key2d ].shape
       encoder_inputs[idx:idx+n2d, :]  = data_x[ key2d ]
       decoder_outputs[idx:idx+n2d, :] = data_y[ key3d ]
       idx = idx + n2d
-
+    
     if training:
       # Randomly permute everything
       idx = np.random.permutation( n )
@@ -293,7 +299,7 @@ class LinearModel(object):
     if n_extra > 0:  # Otherwise examples are already a multiple of batch size
       encoder_inputs  = encoder_inputs[:-n_extra, :]
       decoder_outputs = decoder_outputs[:-n_extra, :]
-
+    
     n_batches = n // self.batch_size
     encoder_inputs  = np.split( encoder_inputs, n_batches )
     decoder_outputs = np.split( decoder_outputs, n_batches )

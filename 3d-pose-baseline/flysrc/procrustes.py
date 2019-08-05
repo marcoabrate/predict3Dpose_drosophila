@@ -1,16 +1,17 @@
 import numpy as np
 import glob
 import os
-import data_utils
-#import deepfly.GUI.skeleton.skeleton_fly as skeleton
-body_coxa_idx = data_utils.DIMENSIONS_TO_USE#[j for j in range(skeleton.num_joints) if skeleton.is_tracked_point(j, skeleton.Tracked.BODY_COXA)]
 
+import data_utils
+
+body_coxa_idx = [0, 5, 10, 19, 24, 29]
 
 def apply_transformation(pts, R=None, t=None, s=None):
     return s * np.dot(pts, R) + t
 
 
 def procrustes(pts ,template, reflection=True):
+    print(body_coxa_idx)
     template_bc = template[:,body_coxa_idx]
     pts_bc = pts[:,body_coxa_idx]
 

@@ -3,14 +3,14 @@
 
 from __future__ import division
 
+import os
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import cv2
 import data_utils
 import viz
-import readpickle
-import os
 
 def project_point_radial( P, R, T, f, c, k, p ):
   """
@@ -68,10 +68,14 @@ def world_to_camera_frame(P, R, T, intr):
 
   assert len(P.shape) == 2
   assert P.shape[1] == 3
-  
-  X_cam = R.dot(P.T - T) # rotate and translate
-
-  return X_cam.T
+ 
+  P = np.vstack(( P.T, np.ones((1,P.shape[0])) ))
+  Rt = np.hstack((R, T))
+  proj = Rt.dot(P)
+ 
+  #pixels = intr.dot(proj)
+  #pixels = pixels[:2,:] / pixels[2,:]
+  return proj.T
 
 def camera_to_world_frame(P, R, T):
   """Inverse of world_to_camera_frame
@@ -86,7 +90,7 @@ def camera_to_world_frame(P, R, T):
 
   assert len(P.shape) == 2
   assert P.shape[1] == 3
-
+  
   X_cam = R.T.dot( P.T ) + T # rotate and translate
 
   return X_cam.T
@@ -107,8 +111,6 @@ def load_camera_params( dic, ncamera ):
   
   c = dic[ncamera]
   R = c['R']
-  R = R.T
-  
   T = c['tvec'].reshape((-1,1))
   intr = c['intr']
   f = (intr[0,0]+intr[1,1])/2
@@ -117,7 +119,7 @@ def load_camera_params( dic, ncamera ):
 
   return R, T, f, ce, d, intr
 
-def load_cameras( data_dir='flydata/' ):
+def load_cameras():
   """Loads the cameras
 
   Args
@@ -126,13 +128,10 @@ def load_cameras( data_dir='flydata/' ):
     rcams: dictionary of 4 tuples per subject ID containing its camera parameters for the 4 h36m cams
   """
   rcams = {}
-  files = [os.path.join(data_dir, f) \
-    for f in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir, f))]
 
-  for f in files:
-    dic = readpickle.read_data(f)
-
-  for c in range(7): # There are 7 cameras
-    rcams[c+1] = load_camera_params( dic, c )
+  for f in data_utils.FILES:
+    dic = data_utils.read_data(f)
+    for c in range(3): # We are interested in the first 4 cameras
+      rcams[(f, c)] = load_camera_params( dic, c )
 
   return rcams

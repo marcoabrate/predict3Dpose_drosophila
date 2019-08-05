@@ -1,5 +1,5 @@
 
-"""Utility functions for dealing with human3.6m data."""
+"""Utility functions for dealing with Drosophila melanogaster data."""
 
 from __future__ import division
 
@@ -7,86 +7,159 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from pickle import load
+
 import cameras
 import viz
 import h5py
 import glob
 import copy
 import sys
-import readpickle
-import random
+import signal_utils
+import procrustes
 
-random.seed(27)
+DATA_DIR = "flydata/"
+FILES = [os.path.join(DATA_DIR, f) \
+     for f in os.listdir(DATA_DIR) if os.path.isfile(os.path.join(DATA_DIR, f))]
+FILES.sort(reverse=False)
+FILE_NUM = len(FILES)
+FILE_BAD = FILES[0]
+FILE_REF = FILES[FILE_NUM-1]
 
-FILE_DIM = 899
-DIM_TO_READ = list(range(FILE_DIM*3))
-TRAIN_DIM = int((2/3)*len(DIM_TO_READ))
+TRAIN_FILES = FILES[:2]
+TEST_FILES = FILES[2:]
 
-TRAIN_SUBJECTS = DIM_TO_READ[:TRAIN_DIM]
-TEST_SUBJECTS = DIM_TO_READ[TRAIN_DIM:]
-
-CAMERA_TO_USE = 2
-PROJECT_CAMERA = 2
+CAMERA_TO_USE = 1
+CAMERA_PROJ = 1
 
 DIMENSIONS = 38
+SUPERIMP_POSITION = 0
 ROOT_POSITION = 0
-DIMENSIONS_TO_USE = [x for x in range(15) if x != ROOT_POSITION]
+BODY_COXA = [0, 5, 10, 19, 24, 29]
+DIMENSIONS_TO_USE = list(range(15))
 
-def load_data( data_dir, subjects, dim ):
+def read_data(dir):
+  with (open(dir, "rb")) as file:
+    try:
+      return load(file)
+    except EOFError:
+      return None
+
+def load_data(dim, rcams=None, camera_frame=False, superimp=False, changeorig=False, procrustes=False,
+  lowpass=False):
   """
   Loads 2d ground truth from disk, and puts it in an easy-to-acess dictionary
 
   Args
-    data_dir: String. Pickle file where to load the data from
-    subjects: List of integers. Subjects whose data will be loaded
     dim: Integer={2,3}. Load 2 or 3-dimensional data
+    rcams:
+    camera_frame:
+    superimp: whether to superimpose the data from different files
+    changeorig: whether to change origin of the system to ROOT_POSITION
+    proc_gt:
+    lowpass:
   Returns:
     data: Dictionary with keys k=(subject, 0)
       values: matrix (38, 3) with the 3d points data
   """
 
-  data = {}
-  files = [os.path.join(data_dir, f) \
-     for f in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir, f))]
   dics = []
-  files.sort(reverse=False)
-  for f in files:
+  dims = np.zeros((FILE_NUM+1), dtype=int)
+  for idx, f in enumerate(FILES):
     print("[*] reading file {0}".format(f))
     if dim == 3:
-      dics.append(readpickle.read_data(f)['points3d'])
+      d = read_data(f)['points3d']
+      if camera_frame:
+        d = transform_world_to_camera(d, rcams, f)
+      dics.append(d)
+      dims[idx+1] = dims[idx] + d.shape[0]
     else: # dim == 2
-      dics.append(readpickle.read_data(f)['points2d'][CAMERA_TO_USE-1])
+      d = read_data(f)['points2d'][CAMERA_TO_USE]
+      dics.append(d)
+      dims[idx+1] = dims[idx] + d.shape[0]
+  end = dics[0].shape[0]
   d_data = np.vstack(dics)
   print("[+] done reading data, shape: ", d_data.shape)
-  #if dim == 3:
-  #  d_data = change_origin(d_data)
-
-  for subj in subjects:
-    if dim == 3:
-      data[ (subj, 0) ] = d_data[subj]
-    else: # dim == 2
-      data[ (subj, CAMERA_TO_USE) ] = d_data[subj]
   
+  if dim == 3 and lowpass:
+    d_data = signal_utils.filter_batch(d_data) 
+  if dim == 3 and changeorig:
+    d_data = change_origin(d_data)
+  
+  data = {}
+  for idx, f in enumerate(FILES):
+    data[(f)] = d_data[dims[idx]:dims[idx+1]]
+  
+  if dim == 3 and procrustes:
+    data = apply_procrustes(data)
+  if dim == 3 and superimp:
+    data = superimpose(data)
+
   return data
 
-def change_origin(data3d):
-  for coord in range(3):
-    dist = np.mean(data3d[:FILE_DIM,ROOT_POSITION,coord]) -\
-       np.mean(data3d[FILE_DIM:,ROOT_POSITION,coord])
-    data3d[FILE_DIM:,:,coord] += dist
-    origin = np.mean(data3d[:,ROOT_POSITION,coord])
-    data3d[:,:,coord] -= origin
-    data3d[:,ROOT_POSITION,coord] = 0
+def transform_world_to_camera(t3d_world, rcams, f):
+    """
+    Project 3d poses from world coordinate to camera coordinate system
+    Args
+      t3d_world: matrix Nx with 3d poses in world coordinates
+      rcams: dictionary with cameras
+    Return:
+      t3d_camera: dictionary with keys (subject, camera)
+        with 3d poses in camera coordinate
+    """
+    t3d_camera = np.zeros(t3d_world.shape)
+    R, T, _, _, _, intr = rcams[ (f, CAMERA_PROJ) ]
+    for i in range(t3d_world.shape[0]):
+      camera_coord = cameras.world_to_camera_frame( t3d_world[i], R, T, intr )
+      t3d_camera[i] = camera_coord
 
+    return t3d_camera
+
+def apply_procrustes(data3d):
+  ground_truth = data3d[(FILE_REF)]
+  for f in range(FILES):
+    if f == FILE_REF:
+      continue
+    pts_t, d = procrustes.procrustes(data3d[(f)], ground_truth, False)
+    data3d[(f)] = pts_t
+ 
+def superimpose(data3d):
+  tmp = data3d.copy()
+  tmp_bad = tmp.pop((FILE_BAD), None)
+  tmp = np.vstack( list(tmp.values()) )
+  for coord in range(3):
+    dist = np.mean(tmp[:,SUPERIMP_POSITION,coord]) -\
+       np.mean(tmp_bad[:,SUPERIMP_POSITION,coord])
+    for (f) in data3d.keys():
+      if f is FILE_BAD:
+        data3d[(f)][:,:,coord] += dist
   return data3d
 
-def normalization_stats(complete_data, dim ):
+def change_origin(data3d):
+  for i in range(data3d.shape[0]):
+    for coord in range(3):
+      data3d[i,:,coord] -= data3d[i,ROOT_POSITION,coord]
+  return data3d
+
+def split_train_test(data, files, dim, camera_frame=False):
+  dic = {}
+  for f in files:
+    if dim == 3 and not camera_frame:
+      dic[ (f, 0) ] = data[(f)]
+    elif dim == 3 and camera_frame:
+      dic[ (f, CAMERA_PROJ) ] = data[(f)]
+    else: # dim == 2
+      dic[ (f, CAMERA_TO_USE) ] = data[(f)]     
+  return dic
+
+def normalization_stats(complete_data, changeorig, dim):
   """
   Computes normalization statistics: mean and stdev, dimensions used and ignored
 
   Args
     complete_data: nxd np array with poses
-    dim. integer={2,3} dimensionality of the data
+    changeorig: do we have a root position?
+    dim: integer={2,3} dimensionality of the data
   Returns
     data_mean: np vector with the mean of the data
     data_std: np vector with the standard deviation of the data
@@ -99,42 +172,19 @@ def normalization_stats(complete_data, dim ):
   data_mean = np.mean(complete_data, axis=0)
   data_std = np.std(complete_data, axis=0)
 
+  if changeorig:
+    dtu = [x for x in DIMENSIONS_TO_USE if x != ROOT_POSITION]
+  else:
+    dtu = DIMENSIONS_TO_USE
+  
   dimensions_to_ignore = []
   if dim == 2:
-    dimensions_to_use = np.sort( np.hstack((np.array(DIMENSIONS_TO_USE)*2,
-      np.array(DIMENSIONS_TO_USE)*2+1)) )
+    dimensions_to_use = np.sort( np.hstack((np.array(dtu)*2, np.array(dtu)*2+1)) )
     dimensions_to_ignore = np.delete(np.arange(DIMENSIONS*2), dimensions_to_use)
   else: # dim == 3
-    dimensions_to_use = np.sort( np.hstack((np.array(DIMENSIONS_TO_USE)*3,
-      np.array(DIMENSIONS_TO_USE)*3+1, np.array(DIMENSIONS_TO_USE)*3+2)) )
+    dimensions_to_use = np.sort( np.hstack((np.array(dtu)*3, np.array(dtu)*3+1, np.array(dtu)*3+2)) )
     dimensions_to_ignore = np.delete(np.arange(DIMENSIONS*3), dimensions_to_use)
   return data_mean, data_std, dimensions_to_ignore, dimensions_to_use
-
-
-def transform_world_to_camera(poses_set, rcams):
-    """
-    Project 3d poses from world coordinate to camera coordinate system
-    Args
-      poses_set: dictionary with 3d poses
-      cams: dictionary with cameras
-      ncams: number of cameras
-    Return:
-      t3d_camera: dictionary with keys (subject, camera)
-        with 3d poses in camera coordinate
-    """
-    t3d_camera = {}
-    for key in sorted( poses_set.keys() ):
-      (subj, _) = key
-      t3d_world = poses_set[ key ]
-      
-      R, T, f, ce, d, intr = rcams[ PROJECT_CAMERA ]
-      camera_coord = cameras.world_to_camera_frame( t3d_world, R, T, intr )
-      camera_coord = np.reshape( camera_coord, (-1, DIMENSIONS*3) )
-
-      t3d_camera[ (subj, PROJECT_CAMERA) ] = camera_coord
-    
-    return t3d_camera
-
 
 def normalize_data(data, data_mean, data_std, dim_to_use, dim):
   """
@@ -210,7 +260,7 @@ def unNormalize_batch(normalized_data, data_mean, data_std, dim_to_use):
   
   return orig_data
 
-def project_to_cameras( poses_set, cams, ncams=4 ):
+def project_to_cameras(poses_set, cams, ncams=4):
   """
   Project 3d poses using camera parameters
 
@@ -237,43 +287,13 @@ def project_to_cameras( poses_set, cams, ncams=4 ):
 
   return t2d
 
-
-def read_2d_predictions( data_dir ):
-  """
-  Loads 2d data from precomputed Stacked Hourglass detections
-
-  Args
-    data_dir: string. Pickle file where the data can be loaded from
-  Returns
-    train_set: dictionary with loaded 2d stacked hourglass detections for training
-    test_set: dictionary with loaded 2d stacked hourglass detections for testing
-    data_mean: vector with the mean of the 2d training data
-    data_std: vector with the standard deviation of the 2d training data
-    dim_to_ignore: list with the dimensions to not predict
-    dim_to_use: list with the dimensions to predict
-  """
-
-  train_set = load_data( data_dir, TRAIN_SUBJECTS, dim=2 )
-  test_set  = load_data( data_dir, TEST_SUBJECTS, dim=2 )
-
-  # Compute normalization statistics
-  complete_train = np.copy( np.vstack( list(train_set.values()) ).reshape((-1, DIMENSIONS*2)) )
-  data_mean, data_std, dim_to_ignore, dim_to_use = \
-    normalization_stats( complete_train, dim=2 )
-  # the root of the legs have STD = 0 !!! so dimensions 0, 5, 10 are NaN in 2d
-  
-  train_set = normalize_data( train_set, data_mean, data_std, dim_to_use, dim=2 )
-  test_set  = normalize_data( test_set,  data_mean, data_std, dim_to_use, dim=2 )
-
-  return train_set, test_set, data_mean, data_std, dim_to_ignore, dim_to_use
-
-def read_3d_data( data_dir, camera_frame, rcams ):
+def read_3d_data( camera_frame, rcams, superimp=False, changeorig=False,
+  proc_gt=-1, lowpass=False ):
   """
   Loads 3d poses, zero-centres and normalizes them
 
   Args
-    data_dir: string. Pickle file where the data can be loaded from
-    camera_frame: boolean. Whether to convert the data to camera coordinates
+   transform_world_to_camera(poses_set, rcams, f): camera_frame: boolean. Whether to convert the data to camera coordinates
     rcams: dictionary with camera parameters
   Returns
     train_set: dictionary with loaded 3d poses for training
@@ -285,28 +305,51 @@ def read_3d_data( data_dir, camera_frame, rcams ):
     train_root_positions: dictionary with the 3d positions of the root in train
     test_root_positions: dictionary with the 3d positions of the root in test
   """
-
+  dim = 3 # reading 3d data
   print("\n[*] dimensions to use: ")
   print(DIMENSIONS_TO_USE)
   print()
   # Load 3d data
-  train_set = load_data( data_dir, TRAIN_SUBJECTS, dim=3 )
-  test_set  = load_data( data_dir, TEST_SUBJECTS, dim=3 )
+  data3d = load_data( dim, rcams, camera_frame, superimp, changeorig, proc_gt, lowpass )
+  train_set = split_train_test( data3d, TRAIN_FILES, dim, camera_frame )
+  test_set  = split_train_test( data3d, TEST_FILES, dim, camera_frame )
   
-  if camera_frame:
-    train_set = transform_world_to_camera( train_set, rcams )
-    test_set  = transform_world_to_camera( test_set, rcams )
-
-  # Apply 3d post-processing (centering around root)
-  train_root_positions = [0, 0, 0]
-  test_root_positions = [0, 0, 0]
   # Compute normalization statistics
   complete_train = np.copy( np.vstack( list(train_set.values()) ).reshape((-1, DIMENSIONS*3)) )
   data_mean, data_std, dim_to_ignore, dim_to_use = \
-    normalization_stats( complete_train, dim=3 )
+    normalization_stats( complete_train, changeorig, dim )
   
   # Divide every dimension independently
-  train_set = normalize_data( train_set, data_mean, data_std, dim_to_use, dim=3 )
-  test_set  = normalize_data( test_set,  data_mean, data_std, dim_to_use, dim=3 )
+  train_set = normalize_data( train_set, data_mean, data_std, dim_to_use, dim )
+  test_set  = normalize_data( test_set,  data_mean, data_std, dim_to_use, dim )
   
-  return train_set, test_set, data_mean, data_std, dim_to_ignore, dim_to_use, train_root_positions, test_root_positions
+  return train_set, test_set, data_mean, data_std, dim_to_ignore, dim_to_use
+
+def read_2d_predictions(changeorig):
+  """
+  Loads 2d data from precomputed Stacked Hourglass detections
+
+  Args
+    changeorig: change the origin of the system to ROOT_POSITION
+  Returns
+    train_set: dictionary with loaded 2d stacked hourglass detections for training
+    test_set: dictionary with loaded 2d stacked hourglass detections for testing
+    data_mean: vector with the mean of the 2d training data
+    data_std: vector with the standard deviation of the 2d training data
+    dim_to_ignore: list with the dimensions to not predict
+    dim_to_use: list with the dimensions to predict
+  """
+  dim = 2 # reading 2d data
+  data2d = load_data( dim )
+  train_set = split_train_test( data2d, TRAIN_FILES, dim )
+  test_set  = split_train_test( data2d, TEST_FILES, dim )
+  
+  # Compute normalization statistics
+  complete_train = np.copy( np.vstack( list(train_set.values()) ).reshape((-1, DIMENSIONS*2)) )
+  data_mean, data_std, dim_to_ignore, dim_to_use = \
+    normalization_stats( complete_train, changeorig, dim )
+  
+  train_set = normalize_data( train_set, data_mean, data_std, dim_to_use, dim )
+  test_set  = normalize_data( test_set,  data_mean, data_std, dim_to_use, dim )
+
+  return train_set, test_set, data_mean, data_std, dim_to_ignore, dim_to_use
