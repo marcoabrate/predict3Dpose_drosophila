@@ -37,13 +37,14 @@ tf.app.flags.DEFINE_integer("num_layers", 2, "Number of layers in the model.")
 tf.app.flags.DEFINE_boolean("residual", False, "Whether to add a residual connection every 2 layers")
 
 # Preprocessing
-tf.app.flags.DEFINE_boolean("superimpose", False, "Superimpose data from different files")
+tf.app.flags.DEFINE_boolean("scale_dist", False, "Scale data wrt distance 1st and 2nd body coxa")
 tf.app.flags.DEFINE_boolean("change_origin", False, "Change the origin of the system to ROOT_POSITION")
 tf.app.flags.DEFINE_boolean("procrustes", False, "Number of the file to use as procrustes ground truth")
 tf.app.flags.DEFINE_boolean("lowpass", False, "Whether to add low-pass filter to 3d data")
+tf.app.flags.DEFINE_boolean("scale_intr", False, "Scale data wrt fx=fy")
 
 # Directories
-tf.app.flags.DEFINE_string("train_dir", "tr12te3", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "tr10", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
@@ -58,8 +59,10 @@ FLAGS = tf.app.flags.FLAGS
 train_dir = FLAGS.train_dir
 if FLAGS.camera_frame:
   train_dir += "_camproj"
-if FLAGS.superimpose:
-  train_dir += "_superimp"
+if FLAGS.scale_dist:
+  train_dir += "_scaled"
+if FLAGS.scale_intr:
+  train_dir += "_scalei"
 if FLAGS.change_origin:
   train_dir += "_neworig"
 if FLAGS.procrustes:
@@ -135,13 +138,23 @@ def train():
   rcams = cameras.load_cameras()
   
   print("Cameras dic:")
+  Rs = []
+  Ts = []
+  intrs = []
   for k in rcams.keys():
-    print(k)
+    (f, c) = k
+    if c == 1:
+      R, T, f, ce, d, intr = rcams[k]
+      Rs.append(R)
+      Ts.append(T)
+      intrs.append(intr)
+  print(np.var(Rs, axis=0))
+  print(np.mean(Rs, axis=0))
 
   # Load 3d data and 2d projections
   full_train_set_3d, full_test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d =\
-    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.superimpose, FLAGS.change_origin,
-    FLAGS.procrustes, FLAGS.lowpass )
+    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.scale_dist, FLAGS.scale_intr,
+    FLAGS.change_origin, FLAGS.procrustes, FLAGS.lowpass )
   
   # Read stacked hourglass 2D predictions
   full_train_set_2d, full_test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
@@ -209,7 +222,7 @@ def train():
 
     step_time, loss = 0, 0
     current_epoch = 0
-    log_every_n_batches = 20
+    log_every_n_batches = 50
 
     for _ in range( FLAGS.epochs ):
       current_epoch = current_epoch + 1
@@ -255,8 +268,11 @@ def train():
 
       # === Testing after this epoch ===
       isTraining = False
-
+      
       n_joints = len(data_utils.DIMENSIONS_TO_USE)
+      if FLAGS.change_origin:
+        n_joints -= len(data_utils.ROOT_POSITIONS)
+
       encoder_inputs, decoder_outputs =\
          model.get_all_batches( test_set_2d, test_set_3d, FLAGS.camera_frame, training=False)
 
@@ -383,8 +399,8 @@ def sample():
 
   # Load 3d data and 2d projections
   full_train_set_3d, full_test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d =\
-    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.superimpose, FLAGS.change_origin,
-    FLAGS.procrustes, FLAGS.lowpass )
+    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.scale_dist, FLAGS.scale_intr,
+    FLAGS.change_origin, FLAGS.procrustes, FLAGS.lowpass )
 
   # Read stacked hourglass 2D predictions
   full_train_set_2d, full_test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
@@ -457,7 +473,7 @@ def sample():
       poses3d = cam2world_centered(poses3d)
     '''
     viz.visualize_test_sample(enc_in, dec_out, poses3d)
-    viz.visualize_test_animation(enc_in, dec_out, poses3d)
+    viz.visualize_test_animation(dec_out, poses3d)
 
 def main(_):
   if FLAGS.sample:

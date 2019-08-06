@@ -68,13 +68,25 @@ def world_to_camera_frame(P, R, T, intr):
 
   assert len(P.shape) == 2
   assert P.shape[1] == 3
- 
+  
   P = np.vstack(( P.T, np.ones((1,P.shape[0])) ))
+  Pnew = np.copy(P)*intr[0,0]
   Rt = np.hstack((R, T))
   proj = Rt.dot(P)
- 
-  #pixels = intr.dot(proj)
-  #pixels = pixels[:2,:] / pixels[2,:]
+  projnew = Rt.dot(Pnew)
+  '''
+  ### tests ###
+  realproj = intr.dot(proj)
+
+  newintr = np.zeros(intr.shape)  
+  newintr = intr/intr[0,0]
+  realproj = newintr.dot(projnew)
+  newintr[1,2] = 0
+  fakeproj = newintr.dot(projnew)
+  return realproj, fakeproj
+  '''
+  pixels = intr.dot(proj)
+  pixels = pixels[:2,:] / pixels[2,:]
   return proj.T
 
 def camera_to_world_frame(P, R, T):

@@ -238,34 +238,27 @@ def visualize_files_animation(train3d, test3d):
   get_3d_pose(channels, ax3d)
 
   ani = animation.FuncAnimation(fig, update_files_graph, min(files_dim[1:])-1,
-    fargs=(files_dim, sets3d, ax3d), interval=100, blit=False)
+    fargs=(files_dim, sets3d, ax3d), interval=10, blit=False)
   Writer = animation.writers['ffmpeg']
   writer = Writer(fps=15, bitrate=1800)
   #ani.save('predictions.mp4', writer=writer)
   plt.show()
 
-def update_test_graph(num, test2d, test3d, predic, ax2d, ax3d):
-  ax2d.cla()
+def update_test_graph(num, test3d, predic, ax3d):
   ax3d.cla()
-  ax2d.set_title("2D pose")
   ax3d.set_title("prediction in RED {0}".format(num))
   channels = [test3d[num].reshape((1,-1)), predic[num].reshape((1,-1))]
   get_3d_pose(channels, ax3d)
-  get_2d_pose(test2d[num].reshape((1,-1)), ax2d)
 
-def visualize_test_animation(test2d, test3d, predic):
+def visualize_test_animation(test3d, predic):
   fig = plt.figure()
-  ax2d = fig.add_subplot(121)
-  ax3d = fig.add_subplot(122, projection='3d')
-  
-  ax2d.set_title("2D pose")
+  ax3d = fig.add_subplot(111, projection='3d')
   ax3d.set_title("prediction in RED 0")
   channels = [test3d[0].reshape((1,-1)), predic[0].reshape((1,-1))]
   get_3d_pose(channels, ax3d)
-  get_2d_pose(test2d[0].reshape((1,-1)), ax2d)
 
   ani = animation.FuncAnimation(fig, update_test_graph, test3d.shape[0],
-    fargs=(test2d, test3d, predic, ax2d, ax3d), interval=100, blit=False)
+    fargs=(test3d, predic, ax3d), interval=10, blit=False)
   Writer = animation.writers['ffmpeg']
   writer = Writer(fps=15, bitrate=1800)
   #ani.save('predictions.mp4', writer=writer)

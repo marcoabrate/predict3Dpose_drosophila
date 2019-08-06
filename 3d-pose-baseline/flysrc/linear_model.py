@@ -64,7 +64,7 @@ class LinearModel(object):
     if not change_origin:
       self.FLY_2D_SIZE = len(data_utils.DIMENSIONS_TO_USE) * 2
     else:
-      self.FLY_2D_SIZE = (len(data_utils.DIMENSIONS_TO_USE)-1) * 2
+      self.FLY_2D_SIZE = (len(data_utils.DIMENSIONS_TO_USE)-len(data_utils.ROOT_POSITIONS)) * 2
 
     # In 3d all the predictions are zero-centered around the root (hip) joint, so
     # we actually predict only 16 joints. The error is still computed over 17 joints,
@@ -76,7 +76,7 @@ class LinearModel(object):
     if not change_origin:
       self.FLY_3D_SIZE = len(data_utils.DIMENSIONS_TO_USE) * 3
     else:
-      self.FLY_3D_SIZE = (len(data_utils.DIMENSIONS_TO_USE)-1) * 3
+      self.FLY_3D_SIZE = (len(data_utils.DIMENSIONS_TO_USE)-len(data_utils.ROOT_POSITIONS)) * 3
 
     self.input_size  = self.FLY_2D_SIZE
     self.output_size = self.FLY_3D_SIZE
