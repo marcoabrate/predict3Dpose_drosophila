@@ -74,10 +74,10 @@ def world_to_camera_frame(P, R, T, intr):
   Rt = np.hstack((R, T))
   proj = Rt.dot(P)
   projnew = Rt.dot(Pnew)
-  '''
-  ### tests ###
+  
+  '''### tests ###
   realproj = intr.dot(proj)
-
+  print(Rt)
   newintr = np.zeros(intr.shape)  
   newintr = intr/intr[0,0]
   realproj = newintr.dot(projnew)
@@ -122,13 +122,16 @@ def load_camera_params( dic, ncamera ):
   """
   
   c = dic[ncamera]
+  if len(list(c.keys())) == 0:
+    return None, None, None, None, None, None
+  
   R = c['R']
   T = c['tvec'].reshape((-1,1))
   intr = c['intr']
   f = (intr[0,0]+intr[1,1])/2
   ce = intr[:2,2]
   d = c['distort']
-
+  
   return R, T, f, ce, d, intr
 
 def load_cameras():
@@ -143,7 +146,7 @@ def load_cameras():
 
   for f in data_utils.FILES:
     dic = data_utils.read_data(f)
-    for c in range(3): # We are interested in the first 4 cameras
+    for c in [1,5]: # We are interested in the first 4 cameras
       rcams[(f, c)] = load_camera_params( dic, c )
 
   return rcams

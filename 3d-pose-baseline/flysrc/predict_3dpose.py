@@ -37,14 +37,13 @@ tf.app.flags.DEFINE_integer("num_layers", 2, "Number of layers in the model.")
 tf.app.flags.DEFINE_boolean("residual", False, "Whether to add a residual connection every 2 layers")
 
 # Preprocessing
-tf.app.flags.DEFINE_boolean("scale_dist", False, "Scale data wrt distance 1st and 2nd body coxa")
 tf.app.flags.DEFINE_boolean("change_origin", False, "Change the origin of the system to ROOT_POSITION")
 tf.app.flags.DEFINE_boolean("procrustes", False, "Number of the file to use as procrustes ground truth")
 tf.app.flags.DEFINE_boolean("lowpass", False, "Whether to add low-pass filter to 3d data")
-tf.app.flags.DEFINE_boolean("scale_intr", False, "Scale data wrt fx=fy")
+tf.app.flags.DEFINE_boolean("origin_bc", False, "Superimpose body coxas at the origin")
 
 # Directories
-tf.app.flags.DEFINE_string("train_dir", "tr10", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "test", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
@@ -57,12 +56,11 @@ tf.app.flags.DEFINE_boolean("use_fp16", False, "Train using fp16 instead of fp32
 FLAGS = tf.app.flags.FLAGS
 
 train_dir = FLAGS.train_dir
+if FLAGS.origin_bc:
+  FLAGS.change_origin = True
+  train_dir += "_origBC"
 if FLAGS.camera_frame:
   train_dir += "_camproj"
-if FLAGS.scale_dist:
-  train_dir += "_scaled"
-if FLAGS.scale_intr:
-  train_dir += "_scalei"
 if FLAGS.change_origin:
   train_dir += "_neworig"
 if FLAGS.procrustes:
@@ -143,7 +141,7 @@ def train():
   intrs = []
   for k in rcams.keys():
     (f, c) = k
-    if c == 1:
+    if c == 5:
       R, T, f, ce, d, intr = rcams[k]
       Rs.append(R)
       Ts.append(T)
@@ -153,14 +151,15 @@ def train():
 
   # Load 3d data and 2d projections
   full_train_set_3d, full_test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d =\
-    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.scale_dist, FLAGS.scale_intr,
-    FLAGS.change_origin, FLAGS.procrustes, FLAGS.lowpass )
+    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.origin_bc, FLAGS.change_origin,
+    FLAGS.procrustes, FLAGS.lowpass )
   
   # Read stacked hourglass 2D predictions
   full_train_set_2d, full_test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
-    data_utils.read_2d_predictions( FLAGS.change_origin )
+    data_utils.read_2d_predictions( FLAGS.origin_bc, FLAGS.change_origin )
   
   print("\n[+] done reading and normalizing data")
+
   tr_subj = 0
   for v in full_train_set_3d.values():
     tr_subj += v.shape[0]
@@ -168,6 +167,8 @@ def train():
   for v in full_test_set_3d.values():
     te_subj += v.shape[0]
   print("{0} training subjects, {1} test subjects".format(tr_subj, te_subj))
+  print(dim_to_use_2d)
+  print(dim_to_use_3d)
   
   unNorm_ftrs2d = data_utils.unNormalize_dic(full_train_set_2d, data_mean_2d, data_std_2d, dim_to_use_2d)
   unNorm_ftrs3d = data_utils.unNormalize_dic(full_train_set_3d, data_mean_3d, data_std_3d, dim_to_use_3d)
@@ -175,7 +176,7 @@ def train():
 
   viz.visualize_train_sample(unNorm_ftrs2d, unNorm_ftrs3d, FLAGS.camera_frame)
   viz.visualize_files_animation(unNorm_ftrs3d, unNorm_ftes3d)
-  
+
   train_set_2d = {}
   test_set_2d = {}
   train_set_3d = {}
@@ -276,7 +277,7 @@ def train():
       encoder_inputs, decoder_outputs =\
          model.get_all_batches( test_set_2d, test_set_3d, FLAGS.camera_frame, training=False)
 
-      total_err, joint_err, step_time, loss = evaluate_batches( sess, model,
+      total_err, coordwise_err, joint_err, step_time, loss = evaluate_batches( sess, model,
         data_mean_3d, data_std_3d, dim_to_use_3d, dim_to_ignore_3d,
         data_mean_2d, data_std_2d, dim_to_use_2d, dim_to_ignore_2d,
         current_step, encoder_inputs, decoder_outputs, current_epoch )
@@ -284,8 +285,9 @@ def train():
       print("=============================\n"
             "Step-time (ms):      %.4f\n"
             "Val loss avg:        %.4f\n"
-            "Val error avg (mm):  %.2f\n"
-            "=============================" % ( 1000*step_time, loss, total_err ))
+            "Val error avg (mm):  %.2f (%.2f, %.2f, %.2f)\n"
+            "=============================" % ( 1000*step_time, loss, total_err,
+      coordwise_err[0], coordwise_err[1], coordwise_err[2] ))
 
       for i in range(n_joints):
         # 6 spaces, right-aligned, 5 decimal places
@@ -331,7 +333,6 @@ def evaluate_batches( sess, model,
     decoder_outputs
     current_epoch
   Returns
-
     total_err
     joint_err
     step_time
@@ -344,7 +345,7 @@ def evaluate_batches( sess, model,
   # Loop through test examples
   all_dists, start_time, loss = [], time.time(), 0.
   log_every_n_batches = 20
-
+  diff_coordwise = []
   for i in range(nbatches):
 
     if current_epoch > 0 and (i+1) % log_every_n_batches == 0:
@@ -368,6 +369,7 @@ def evaluate_batches( sess, model,
     assert poses3d.shape[0] == FLAGS.batch_size
 
     # Compute Euclidean distance error per joint
+    diff_coordwise.append(np.abs(poses3d - dec_out))
     sqerr = (poses3d - dec_out)**2 # Squared error between prediction and expected output
     dists = np.zeros( (sqerr.shape[0], n_joints) ) # Array with L2 error per joint in mm
     dist_idx = 0
@@ -378,7 +380,10 @@ def evaluate_batches( sess, model,
 
     all_dists.append(dists)
     assert sqerr.shape[0] == FLAGS.batch_size
-
+  diff_coordwise_arr = np.vstack(diff_coordwise)
+  diff_coordwise_mean = np.mean(diff_coordwise_arr, axis=0)
+  coordwise_err = np.mean(diff_coordwise_mean.reshape(3,-1), axis=1)
+  
   step_time = (time.time() - start_time) / nbatches
   loss      = loss / nbatches
 
@@ -388,7 +393,7 @@ def evaluate_batches( sess, model,
   joint_err = np.mean( all_dists, axis=0 )
   total_err = np.mean( all_dists )
 
-  return total_err, joint_err, step_time, loss
+  return total_err, coordwise_err, joint_err, step_time, loss
 
 
 def sample():
@@ -399,15 +404,14 @@ def sample():
 
   # Load 3d data and 2d projections
   full_train_set_3d, full_test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d =\
-    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.scale_dist, FLAGS.scale_intr,
-    FLAGS.change_origin, FLAGS.procrustes, FLAGS.lowpass )
+    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.origin_bc, FLAGS.change_origin,
+    FLAGS.procrustes, FLAGS.lowpass )
 
   # Read stacked hourglass 2D predictions
   full_train_set_2d, full_test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
-    data_utils.read_2d_predictions( FLAGS.change_origin )
+    data_utils.read_2d_predictions( FLAGS.origin_bc, FLAGS.change_origin )  
 
   print("[+] done reading and normalizing data")
-  
   train_set_2d = {}
   test_set_2d = {}
   train_set_3d = {}

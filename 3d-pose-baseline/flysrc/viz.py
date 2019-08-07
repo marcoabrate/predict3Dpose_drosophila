@@ -13,6 +13,13 @@ import random
 
 import data_utils
 
+if data_utils.CAMERA_TO_USE < 4:
+  I  = np.array([0,1,2,3,5,6,7,8,10,11,12,13]) # start points
+  J  = np.array([1,2,3,4,6,7,8,9,11,12,13,14]) # end points
+else:
+  I  = np.array([19,20,21,22,24,25,26,27,29,30,31,32]) # start points
+  J  = np.array([20,21,22,23,25,26,27,28,30,31,32,33]) # end points
+
 COLORS = ["#3498db", "#e74c3c", "#32cd32"]
 TEST_COLORS = ["#000099", "#800000", "#006600"]
 
@@ -36,8 +43,6 @@ def show3Dpose(channels, ax, test_colors=False):
   #  x2  y2  z2
   #  ...
   #  x13  y13  z13
-  I  = np.array([0,1,2,3,5,6,7,8,10,11,12,13]) # start points
-  J  = np.array([1,2,3,4,6,7,8,9,11,12,13,14]) # end points
   cidx = 0
 
   # Make connection matrix
@@ -97,9 +102,6 @@ def show2Dpose(channels, ax):
   #  x2  y2
   #  ...
   #  x13  y13
-
-  I  = np.array([0,1,2,3,5,6,7,8,10,11,12,13]) # start points
-  J  = np.array([1,2,3,4,6,7,8,9,11,12,13,14]) # end points
   cidx = 0
 
   # Make connection matrix
@@ -265,8 +267,6 @@ def visualize_test_animation(test3d, predic):
   plt.show()
 
 def get_3d_pose(channels, ax):
-  I  = np.array([0,1,2,3,5,6,7,8,10,11,12,13]) # start points
-  J  = np.array([1,2,3,4,6,7,8,9,11,12,13,14]) # end points
   cidx = 0
   colors = ["#004100", "#009600", "#00ff00", "#410000", "#960000", "#ff0000",\
     "#000041", "#000096", "#0000ff"]
@@ -284,9 +284,6 @@ def get_3d_pose(channels, ax):
 
 def get_2d_pose(channel, ax):
   vals = channel.reshape((-1, 2))  
-
-  I  = np.array([0,1,2,3,5,6,7,8,10,11,12,13]) # start points
-  J  = np.array([1,2,3,4,6,7,8,9,11,12,13,14]) # end points
   cidx = 0
 
   # Make connection matrix
