@@ -146,7 +146,7 @@ def load_cameras():
 
   for f in data_utils.FILES:
     dic = data_utils.read_data(f)
-    for c in [1,5]: # We are interested in the first 4 cameras
+    for c in range(3):
       rcams[(f, c)] = load_camera_params( dic, c )
 
   return rcams

@@ -56,23 +56,11 @@ class LinearModel(object):
       dtype: the data type to use to store internal variables
     """
 
-    # There are in total 17 joints in H3.6M and 16 in MPII (and therefore in stacked
-    # hourglass detections). We settled with 16 joints in 2d just to make models
-    # compatible (e.g. you can train on ground truth 2d and test on SH detections).
-    # This does not seem to have an effect on prediction performance.
-    #self.HUMAN_2D_SIZE = 16 * 2
     if not change_origin:
       self.FLY_2D_SIZE = len(data_utils.DIMENSIONS_TO_USE) * 2
     else:
       self.FLY_2D_SIZE = (len(data_utils.DIMENSIONS_TO_USE)-len(data_utils.ROOT_POSITIONS)) * 2
 
-    # In 3d all the predictions are zero-centered around the root (hip) joint, so
-    # we actually predict only 16 joints. The error is still computed over 17 joints,
-    # because if one uses, e.g. Procrustes alignment, there is still error in the
-    # hip to account for!
-    # There is also an option to predict only 14 joints, which makes our results
-    # directly comparable to those in https://arxiv.org/pdf/1611.09010.pdf
-    #self.HUMAN_3D_SIZE = 14 * 3 if predict_14 else 16 * 3
     if not change_origin:
       self.FLY_3D_SIZE = len(data_utils.DIMENSIONS_TO_USE) * 3
     else:

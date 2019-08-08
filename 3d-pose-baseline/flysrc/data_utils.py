@@ -65,14 +65,6 @@ def read_data(dir):
     except EOFError:
       return None
 
-def put_leg_together(d):
-  file_dim = d.shape[0]
-  newd = np.zeros((file_dim*3, d.shape[1], d.shape[2]))
-  for (i,bc) in enumerate(BODY_COXA[:3]):
-    substitute = d[:,bc:bc+5]
-    newd[i*file_dim:(i+1)*file_dim,0:5] = substitute
-  return newd
-
 def load_data(dim, rcams=None, camera_frame=False, origin_bc=False, changeorig=False,
   procrustes=False, lowpass=False):
   """
@@ -96,27 +88,21 @@ def load_data(dim, rcams=None, camera_frame=False, origin_bc=False, changeorig=F
   for idx, f in enumerate(FILES):
     print("[*] reading file {0}".format(f))
     if dim == 3:
-      #d1 = read_data(f)['points3d'][:,0:15]
-      #d2 = read_data(f)['points3d'][:,19:34]
-      d = read_data(f)['points3d']
+      dinit = read_data(f)['points3d']
       if camera_frame:
-        #d1 = transform_world_to_camera(d1, rcams, 1, f)
-        #d2 = transform_world_to_camera(d2, rcams, 5, f)
-        d = transform_world_to_camera(d, rcams, CAMERA_PROJ, f)
-      #d = np.vstack((d1,d2))
+        d = transform_world_to_camera(dinit, rcams, CAMERA_PROJ, f)
+        d = np.vstack((d, transform_world_to_camera(dinit, rcams, 0, f)))
+        d = np.vstack((d, transform_world_to_camera(dinit, rcams, 2, f)))
       if origin_bc:
         d = origin_body_coxa_3d(d)
-      #d = put_leg_together(d)
       dics.append(d)
       dims[idx+1] = dims[idx] + d.shape[0]
     else: # dim == 2
-      #d1 = read_data(f)['points2d'][1][:,0:15]
-      #d2 = read_data(f)['points2d'][5][:,19:34]
       d = read_data(f)['points2d'][CAMERA_TO_USE]
+      d = np.vstack((d, read_data(f)['points2d'][0]))
+      d = np.vstack((d, read_data(f)['points2d'][2]))
       if origin_bc:
         d = origin_body_coxa_2d(d)
-      #d = np.vstack((d1,d2))
-      #d = put_leg_together(d)
       dics.append(d)
       dims[idx+1] = dims[idx] + d.shape[0]
   d_data = np.vstack(dics)

@@ -141,7 +141,7 @@ def train():
   intrs = []
   for k in rcams.keys():
     (f, c) = k
-    if c == 5:
+    if c == 1:
       R, T, f, ce, d, intr = rcams[k]
       Rs.append(R)
       Ts.append(T)
