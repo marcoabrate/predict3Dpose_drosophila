@@ -25,14 +25,27 @@ DATA_DIR = "flydata/"
 FILES = [os.path.join(DATA_DIR, f) \
      for f in os.listdir(DATA_DIR) if os.path.isfile(os.path.join(DATA_DIR, f))]
 FILES.sort(reverse=False)
-random.shuffle(FILES)
-FILES = FILES[:]
 FILE_NUM = len(FILES)
-FILE_REF = FILES[FILE_NUM-1]
+FILE_REF = FILES[FILE_NUM-1]   
 
-TRAIN_NUM = int(round(0.8*FILE_NUM))
-TRAIN_FILES = FILES[:TRAIN_NUM]
-TEST_FILES = FILES[TRAIN_NUM:]
+ONE_FLY = True
+if ONE_FLY:
+  ### selecting one fly for testing
+  TEST_FILES = FILES[3:25]
+  TRAIN_FILES = FILES[:3]+FILES[25:]
+  print(TEST_FILES)
+  print(TRAIN_FILES)
+  random.shuffle(TRAIN_FILES)
+  random.shuffle(TEST_FILES)
+  ### ------------------------- ###
+else:
+  ### randomly select flis for testing
+  random.shuffle(FILES)
+ 
+  TRAIN_NUM = int(round(0.84*FILE_NUM))
+  TRAIN_FILES = FILES[:TRAIN_NUM]
+  TEST_FILES = FILES[TRAIN_NUM:]
+  ### ---------------------------- ###
 
 CAMERA_TO_USE = 1 
 CAMERA_PROJ = CAMERA_TO_USE

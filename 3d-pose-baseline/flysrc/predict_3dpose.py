@@ -44,7 +44,7 @@ tf.app.flags.DEFINE_boolean("lowpass", False, "Whether to add low-pass filter to
 tf.app.flags.DEFINE_boolean("origin_bc", False, "Superimpose body coxas at the origin")
 
 # Directories
-tf.app.flags.DEFINE_string("train_dir", "test", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "tr_all_te_3-25_200epochs_newcamframe", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
