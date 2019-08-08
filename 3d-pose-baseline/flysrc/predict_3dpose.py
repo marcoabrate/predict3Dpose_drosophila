@@ -32,6 +32,7 @@ tf.app.flags.DEFINE_boolean("max_norm", False, "Apply maxnorm constraint to the 
 tf.app.flags.DEFINE_boolean("batch_norm", False, "Use batch_normalization")
 
 # Architecture
+# TODO: try linear size of 512 and 2048
 tf.app.flags.DEFINE_integer("linear_size", 1024, "Size of each model layer.")
 tf.app.flags.DEFINE_integer("num_layers", 2, "Number of layers in the model.")
 tf.app.flags.DEFINE_boolean("residual", False, "Whether to add a residual connection every 2 layers")
@@ -67,6 +68,8 @@ if FLAGS.procrustes:
   train_dir += "_procrustes"
 if FLAGS.lowpass:
   train_dir += "_lowpass"
+train_dir += "_size"+str(FLAGS.linear_size)
+train_dir += "_dropout"+str(FLAGS.dropout)
 train_dir += "_"+str(FLAGS.learning_rate)
 
 print("\n\n[*] training directory: ", train_dir)
