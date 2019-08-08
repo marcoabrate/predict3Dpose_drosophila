@@ -380,9 +380,6 @@ def evaluate_batches( sess, model,
 
     all_dists.append(dists)
     assert sqerr.shape[0] == FLAGS.batch_size
-  diff_coordwise_arr = np.vstack(diff_coordwise)
-  diff_coordwise_mean = np.mean(diff_coordwise_arr, axis=0)
-  coordwise_err = np.mean(diff_coordwise_mean.reshape(3,-1), axis=1)
   
   step_time = (time.time() - start_time) / nbatches
   loss      = loss / nbatches
@@ -391,6 +388,7 @@ def evaluate_batches( sess, model,
 
   # Error per joint and total for all passed batches
   joint_err = np.mean( all_dists, axis=0 )
+  coordwise_err = np.mean(np.vstack(diff_coordwise).reshape((-1,3)), axis=0)
   total_err = np.mean( all_dists )
 
   return total_err, coordwise_err, joint_err, step_time, loss
