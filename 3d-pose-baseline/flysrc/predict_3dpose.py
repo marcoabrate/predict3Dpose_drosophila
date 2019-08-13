@@ -43,7 +43,7 @@ tf.app.flags.DEFINE_boolean("origin_bc", False, "Superimpose body coxas at the o
 tf.app.flags.DEFINE_boolean("augment_data", False, "Augment the data using 2 additional cameras")
 
 # Directories
-tf.app.flags.DEFINE_string("train_dir", "tr_all_te_3-24_200epochs_newcamframe", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "tr_all_te3-24", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
@@ -56,6 +56,7 @@ tf.app.flags.DEFINE_boolean("use_fp16", False, "Train using fp16 instead of fp32
 FLAGS = tf.app.flags.FLAGS
 
 train_dir = FLAGS.train_dir
+train_dir += "_"+str(FLAGS.epochs)+"epochs"
 if FLAGS.origin_bc:
   train_dir += "_origBC"
 if FLAGS.camera_frame:
@@ -176,8 +177,8 @@ def train():
   unNorm_ftes3d = data_utils.unNormalize_dic(full_test_set_3d, data_mean_3d, data_std_3d, dim_to_use_3d)
 
   viz.visualize_train_sample(unNorm_ftrs2d, unNorm_ftrs3d, FLAGS.camera_frame)
-  viz.visualize_files_animation(unNorm_ftrs3d, unNorm_ftes3d)
-  viz.visualize_file_oneatatime(unNorm_ftrs3d, unNorm_ftes3d)
+  #viz.visualize_files_animation(unNorm_ftrs3d, unNorm_ftes3d)
+  viz.visualize_files_oneatatime(unNorm_ftrs3d, unNorm_ftes3d)
 
   train_set_3d, train_set_2d, test_set_3d, test_set_2d = {}, {}, {}, {}
   for k in full_train_set_3d:
@@ -511,7 +512,8 @@ def sample():
         dec_out[s:e] = cam2world_centered(dec_out[s:e])
         poses3d[s:e] = cam2world_centered(poses3d[s:e])
     '''
-    data_utils.separate_body_coxa_3d([dec_out, poses3d], rcams) 
+    if FLAGS.origin_bc:
+      data_utils.separate_body_coxa_3d([dec_out, poses3d], rcams) 
     viz.visualize_test_sample(enc_in, dec_out, poses3d)
     viz.visualize_test_animation(dec_out, poses3d)
 

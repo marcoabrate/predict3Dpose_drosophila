@@ -240,35 +240,34 @@ def visualize_files_animation(train3d, test3d):
   #ani.save('predictions.mp4', writer=writer)
   plt.show()
 
-def update_file_oneatatime(num, f, data3d, ax3d):
+def update_files_oneatatime(num, data3d, files, ax3d):
+  f = files[int(num/10)]
   ax3d.cla()
-  ax3d.set_title("{0} {1}".format(f, num))
-  channels = [data3d[num]]
+  ax3d.set_title(f[7:])
+  channels = [ data3d[num] ]
   get_3d_pose(channels, ax3d)
 
-def visualize_file_oneatatime(train3d, test3d):
+def visualize_files_oneatatime(train3d, test3d):
+  data3d = []
+  files = []
   for k in train3d.keys():
-    fig = plt.figure()
-    ax3d = fig.add_subplot(111, projection='3d')
-    (f, _) = k
-    ax3d.set_title(f)
-    file_dim = train3d[k].shape[0]
-    channels = [train3d[k][0]]
-    get_3d_pose(channels, ax3d)
-    ani = animation.FuncAnimation(fig, update_file_oneatatime, 5,
-      fargs=(f, train3d[k], ax3d), interval=1, blit=False)
-    plt.show()
+    f, _ = k
+    data3d.append(train3d[k][:10])
+    files.append(f)
   for k in test3d.keys():
-    fig = plt.figure()
-    ax3d = fig.add_subplot(111, projection='3d')
-    (f, _) = k
-    ax3d.set_title(f)
-    file_dim = test3d[k].shape[0]
-    channels = [test3d[k]]
-    get_3d_pose(channels, ax3d)
-    ani = animation.FuncAnimation(fig, update_file_oneatatime, 5,
-      fargs=(f, test3d[k], ax3d), interval=1, blit=False)
-    plt.show()
+    f, _ = k
+    data3d.append(test3d[k][:10])
+    files.append(f)
+  data3d = np.vstack(data3d)
+
+  fig = plt.figure()
+  ax3d = fig.add_subplot(111, projection='3d')
+  ax3d.set_title(files[0])
+  channels = [ data3d[0] ]
+  get_3d_pose(channels, ax3d)
+  ani = animation.FuncAnimation(fig, update_files_oneatatime, len(files)*10,
+    fargs=(data3d, files, ax3d), interval=5, blit=False)
+  plt.show()
 
 def update_test_graph(num, test3d, predic, ax3d):
   ax3d.cla()

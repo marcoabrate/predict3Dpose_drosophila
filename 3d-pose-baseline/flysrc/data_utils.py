@@ -30,6 +30,11 @@ else:
   DATA_DIR = "calib/"
 FILES = [os.path.join(DATA_DIR, f) \
      for f in os.listdir(DATA_DIR) if os.path.isfile(os.path.join(DATA_DIR, f))]
+
+if CAMERA_TO_USE > 3:
+  for i, f in enumerate(FILES):
+    FILES[i] = f.replace("calib/calib", "flydata/pose_result")
+
 FILES.sort(reverse=False)
 FILE_NUM = len(FILES)
 FILE_REF = FILES[FILE_NUM-1]   
@@ -37,8 +42,8 @@ FILE_REF = FILES[FILE_NUM-1]
 ONE_FLY = True 
 if ONE_FLY:
   ### selecting one fly for testing
-  TEST_FILES = [FILES[FILE_NUM-1]]
-  TRAIN_FILES = FILES[:FILE_NUM-1]
+  TEST_FILES = FILES[3:24]
+  TRAIN_FILES = FILES[:3]+FILES[24:]
   random.shuffle(TRAIN_FILES)
   random.shuffle(TEST_FILES)
   ### ------------------------- ###
@@ -181,14 +186,15 @@ def separate_body_coxa_3d(list_of_data3d, rcams):
     d = transform_world_to_camera(dinit, rcams, CAMERA_PROJ, f)
     dics.append(d)
   data3d = np.vstack(dics)
-  data3d_mean = np.mean(data3d, axis=0).reshape((-1,))
-  print(data3d.shape)
-  print(list_of_data3d[0].shape)
-  exit(0)
+  dists = []
   for bc in BODY_COXA:
-    for d in list_of_data3d:
-      for leg in range(15):
-        d[:,bc*3+leg] += data3d_mean[bc*3+leg]
+    d = np.mean(data3d[:,bc] - data3d[:,BODY_COXA[0]], axis=0)
+    for i in range(5):
+      dists.append(d)
+  dists = np.hstack(dists)
+  for d in list_of_data3d:
+    d[:,:15*3] += dists[:15*3]
+    d[:,19*3:19*3+15*3] += dists[15*3:]
 
 def apply_procrustes(data3d):
   ground_truth = data3d[(FILE_REF)]
