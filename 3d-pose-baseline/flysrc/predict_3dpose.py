@@ -32,19 +32,18 @@ tf.app.flags.DEFINE_boolean("max_norm", False, "Apply maxnorm constraint to the 
 tf.app.flags.DEFINE_boolean("batch_norm", False, "Use batch_normalization")
 
 # Architecture
-# TODO: try linear size of 512 and 2048
 tf.app.flags.DEFINE_integer("linear_size", 1024, "Size of each model layer.")
 tf.app.flags.DEFINE_integer("num_layers", 2, "Number of layers in the model.")
 tf.app.flags.DEFINE_boolean("residual", False, "Whether to add a residual connection every 2 layers")
 
 # Preprocessing
-tf.app.flags.DEFINE_boolean("change_origin", False, "Change the origin of the system to ROOT_POSITION")
 tf.app.flags.DEFINE_boolean("procrustes", False, "Number of the file to use as procrustes ground truth")
 tf.app.flags.DEFINE_boolean("lowpass", False, "Whether to add low-pass filter to 3d data")
 tf.app.flags.DEFINE_boolean("origin_bc", False, "Superimpose body coxas at the origin")
+tf.app.flags.DEFINE_boolean("augment_data", False, "Augment the data using 2 additional cameras")
 
 # Directories
-tf.app.flags.DEFINE_string("train_dir", "tr_all_te_3-25_200epochs_newcamframe", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "tr_all_te_3-24_200epochs_newcamframe", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
@@ -58,12 +57,11 @@ FLAGS = tf.app.flags.FLAGS
 
 train_dir = FLAGS.train_dir
 if FLAGS.origin_bc:
-  FLAGS.change_origin = True
   train_dir += "_origBC"
 if FLAGS.camera_frame:
   train_dir += "_camproj"
-if FLAGS.change_origin:
-  train_dir += "_neworig"
+if FLAGS.augment_data:
+  train_dir += "_augment"
 if FLAGS.procrustes:
   train_dir += "_procrustes"
 if FLAGS.lowpass:
@@ -99,7 +97,7 @@ def create_model( session, batch_size ):
       FLAGS.max_norm,
       batch_size,
       FLAGS.learning_rate,
-      FLAGS.change_origin,
+      FLAGS.origin_bc,
       summaries_dir,
       dtype=tf.float16 if FLAGS.use_fp16 else tf.float32)
 
@@ -154,12 +152,12 @@ def train():
 
   # Load 3d data and 2d projections
   full_train_set_3d, full_test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d =\
-    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.origin_bc, FLAGS.change_origin,
+    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.origin_bc, FLAGS.augment_data,
     FLAGS.procrustes, FLAGS.lowpass )
   
   # Read stacked hourglass 2D predictions
   full_train_set_2d, full_test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
-    data_utils.read_2d_predictions( FLAGS.origin_bc, FLAGS.change_origin )
+    data_utils.read_2d_predictions( FLAGS.origin_bc, FLAGS.augment_data )
   
   print("\n[+] done reading and normalizing data")
 
@@ -179,11 +177,9 @@ def train():
 
   viz.visualize_train_sample(unNorm_ftrs2d, unNorm_ftrs3d, FLAGS.camera_frame)
   viz.visualize_files_animation(unNorm_ftrs3d, unNorm_ftes3d)
+  viz.visualize_file_oneatatime(unNorm_ftrs3d, unNorm_ftes3d)
 
-  train_set_2d = {}
-  test_set_2d = {}
-  train_set_3d = {}
-  test_set_3d = {}
+  train_set_3d, train_set_2d, test_set_3d, test_set_2d = {}, {}, {}, {}
   for k in full_train_set_3d:
     (f, c) = k
     train_set_3d[k] = full_train_set_3d[k][:, dim_to_use_3d]
@@ -274,7 +270,7 @@ def train():
       isTraining = False
       
       n_joints = len(data_utils.DIMENSIONS_TO_USE)
-      if FLAGS.change_origin:
+      if FLAGS.origin_bc:
         n_joints -= len(data_utils.ROOT_POSITIONS)
 
       encoder_inputs, decoder_outputs =\
@@ -342,7 +338,7 @@ def evaluate_batches( sess, model,
     loss
   """
 
-  n_joints = len( data_utils.DIMENSIONS_TO_USE )
+  n_joints = len( data_utils.DIMENSIONS_TO_USE ) - len( data_utils.ROOT_POSITIONS)
   nbatches = len( encoder_inputs )
 
   # Loop through test examples
@@ -396,7 +392,6 @@ def evaluate_batches( sess, model,
 
   return total_err, coordwise_err, joint_err, step_time, loss
 
-
 def sample():
   """Get samples from a model and visualize them"""
 
@@ -404,24 +399,19 @@ def sample():
   rcams = cameras.load_cameras()
 
   # Load 3d data and 2d projections
-  full_train_set_3d, full_test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d =\
-    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.origin_bc, FLAGS.change_origin,
+  _, full_test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d =\
+    data_utils.read_3d_data( FLAGS.camera_frame, rcams, FLAGS.origin_bc, False,
     FLAGS.procrustes, FLAGS.lowpass )
 
   # Read stacked hourglass 2D predictions
-  full_train_set_2d, full_test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
-    data_utils.read_2d_predictions( FLAGS.origin_bc, FLAGS.change_origin )  
+  _, full_test_set_2d, data_mean_2d, data_std_2d, dim_to_ignore_2d, dim_to_use_2d = \
+    data_utils.read_2d_predictions( FLAGS.origin_bc, False )
+  
+  print(data_mean_3d)
+  print(data_std_3d)
 
   print("[+] done reading and normalizing data")
-  train_set_2d = {}
-  test_set_2d = {}
-  train_set_3d = {}
-  test_set_3d = {}
-  for k in full_train_set_3d:
-    (f, c) = k
-    train_set_3d[k] = full_train_set_3d[k][:, dim_to_use_3d]
-    train_set_2d[(f, data_utils.CAMERA_TO_USE)] =\
-       full_train_set_2d[(f, data_utils.CAMERA_TO_USE)][:, dim_to_use_2d]
+  test_set_2d, test_set_3d = {}, {}
   for k in full_test_set_3d:
     (f, c) = k
     test_set_3d[k] = full_test_set_3d[k][:, dim_to_use_3d]
@@ -437,6 +427,8 @@ def sample():
     batch_size = FLAGS.batch_size #128 ???
     # Dropout probability 0 (keep probability 1) for sampling
     dp = 1.0
+  
+    n_joints = len( data_utils.DIMENSIONS_TO_USE ) - len( data_utils.ROOT_POSITIONS)
 
     model = create_model(sess, batch_size)
     print("[+] model loaded")
@@ -447,7 +439,9 @@ def sample():
     
     all_enc_in = []
     all_dec_out = []
-    all_poses_3d = []
+    all_poses3d = []
+    diff_coordwise = []
+    all_dists = []
     for i in range( nbatches ):
       enc_in, dec_out = encoder_inputs[i], decoder_outputs[i]
       _, _, poses3d = model.step(sess, enc_in, dec_out, dp, isTraining=False)
@@ -456,27 +450,68 @@ def sample():
       enc_in  = data_utils.unNormalize_batch(enc_in, data_mean_2d, data_std_2d, dim_to_use_2d)
       dec_out = data_utils.unNormalize_batch(dec_out, data_mean_3d, data_std_3d, dim_to_use_3d)
       poses3d = data_utils.unNormalize_batch(poses3d, data_mean_3d, data_std_3d, dim_to_use_3d)
+
+      dec_out_red = dec_out[:, dim_to_use_3d]
+      poses3d_red = poses3d[:, dim_to_use_3d]
+
+      assert dec_out_red.shape[0] == FLAGS.batch_size
+      assert poses3d_red.shape[0] == FLAGS.batch_size
+    
+      # Compute Euclidean distance error per joint
+      diff_coordwise.append(np.abs(poses3d_red - dec_out_red))
+      sqerr = (poses3d_red - dec_out_red)**2 # Squared error between prediction and expected output
+      dists = np.zeros( (sqerr.shape[0], n_joints) ) # Array with L2 error per joint in mm
+      dist_idx = 0
+      for k in np.arange(0, n_joints*3, 3):
+        # Sum across X,Y, and Z dimenstions to obtain L2 distance
+        dists[:,dist_idx] = np.sqrt( np.sum( sqerr[:, k:k+3], axis=1 ))
+        dist_idx += 1
+    
+      all_dists.append(dists)
+      assert sqerr.shape[0] == FLAGS.batch_size
+      
       all_enc_in.append( enc_in )
       all_dec_out.append( dec_out )
-      all_poses_3d.append( poses3d )
-
-    # Put all the poses together
-    enc_in, dec_out, poses3d = map( np.vstack, [all_enc_in, all_dec_out, all_poses_3d] )
+      all_poses3d.append( poses3d )
     
+    all_dists = np.vstack( all_dists ) 
+    # Error per joint, per coordinate and total for all passed batches
+    joint_err = np.mean( all_dists, axis=0 )
+    coordwise_err = np.mean(np.vstack(diff_coordwise).reshape((-1,3)), axis=0)
+    total_err = np.mean( all_dists )
+    print("=============================\n"
+          "Val error avg (mm):  %.2f (%.2f, %.2f, %.2f)\n"
+          "=============================" % ( total_err,
+      coordwise_err[0], coordwise_err[1], coordwise_err[2] ))
+
+    for i in range(n_joints):
+      print("Error in joint {0:02d} (mm): {1:>5.2f}".format(i+1, joint_err[i]))
+    print("=============================")
+
+ 
+    # Put all the poses together
+    enc_in, dec_out, poses3d = map( np.vstack, [all_enc_in, all_dec_out, all_poses3d] )
+    
+    files = [k[0] for k in test_set_3d.keys()]
+    files_dim = [v.shape[0] for v in test_set_3d.values()]
+    files_dim.insert(0, 0)
+    '''
     # Convert back to world coordinates
-    '''
     if FLAGS.camera_frame:
-      R, T, f, ce, d, intr = rcams[data_utils.PROJECT_CAMERA]
+      for i, f in enumerate(files):
+        R, T, f, ce, d, intr = rcams[(f, data_utils.CAMERA_PROJ)]
 
-      def cam2world_centered(data_3d_camframe):
-        data_3d_worldframe = cameras.camera_to_world_frame(data_3d_camframe.reshape((-1, 3)), R, T)
-        data_3d_worldframe = data_3d_worldframe.reshape((-1, data_utils.DIMENSIONS*3))
-        return data_3d_worldframe
+        def cam2world_centered(data_3d_camframe):
+          data_3d_worldframe = cameras.camera_to_world_frame(data_3d_camframe.reshape((-1, 3)), R, T)
+          data_3d_worldframe = data_3d_worldframe.reshape((-1, data_utils.DIMENSIONS*3))
+          return data_3d_worldframe
 
-      # Apply inverse rotation and translation
-      dec_out = cam2world_centered(dec_out)
-      poses3d = cam2world_centered(poses3d)
+        # Apply inverse rotation and translation
+        s, e = files_dim[i], files_dim[i+1]
+        dec_out[s:e] = cam2world_centered(dec_out[s:e])
+        poses3d[s:e] = cam2world_centered(poses3d[s:e])
     '''
+    data_utils.separate_body_coxa_3d([dec_out, poses3d], rcams) 
     viz.visualize_test_sample(enc_in, dec_out, poses3d)
     viz.visualize_test_animation(dec_out, poses3d)
 

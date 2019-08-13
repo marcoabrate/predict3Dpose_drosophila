@@ -57,11 +57,6 @@ def show3Dpose(channels, ax, test_colors=False):
     if (i+1)%4 == 0:
       cidx += 1
 
-  # NORMALIZE MEDIAN ???
-  #def normalize_pose_3d(points3d, normalize_length=False, normalize_median=True):
-  #  if normalize_median:
-  #    points3d -= np.median(points3d.reshape(-1, 3), axis=0)
-  
   # Get rid of the ticks and tick labels
   ax.set_xticks([])
   ax.set_yticks([])
@@ -75,7 +70,6 @@ def show3Dpose(channels, ax, test_colors=False):
   white = (1.0, 1.0, 1.0, 0.0)
   #ax.w_xaxis.set_pane_color(white)
   #ax.w_yaxis.set_pane_color(white)
-  # Keep z pane
 
   # Get rid of the lines in 3d
   ax.w_xaxis.line.set_color(white)
@@ -245,6 +239,36 @@ def visualize_files_animation(train3d, test3d):
   writer = Writer(fps=15, bitrate=1800)
   #ani.save('predictions.mp4', writer=writer)
   plt.show()
+
+def update_file_oneatatime(num, f, data3d, ax3d):
+  ax3d.cla()
+  ax3d.set_title("{0} {1}".format(f, num))
+  channels = [data3d[num]]
+  get_3d_pose(channels, ax3d)
+
+def visualize_file_oneatatime(train3d, test3d):
+  for k in train3d.keys():
+    fig = plt.figure()
+    ax3d = fig.add_subplot(111, projection='3d')
+    (f, _) = k
+    ax3d.set_title(f)
+    file_dim = train3d[k].shape[0]
+    channels = [train3d[k][0]]
+    get_3d_pose(channels, ax3d)
+    ani = animation.FuncAnimation(fig, update_file_oneatatime, 5,
+      fargs=(f, train3d[k], ax3d), interval=1, blit=False)
+    plt.show()
+  for k in test3d.keys():
+    fig = plt.figure()
+    ax3d = fig.add_subplot(111, projection='3d')
+    (f, _) = k
+    ax3d.set_title(f)
+    file_dim = test3d[k].shape[0]
+    channels = [test3d[k]]
+    get_3d_pose(channels, ax3d)
+    ani = animation.FuncAnimation(fig, update_file_oneatatime, 5,
+      fargs=(f, test3d[k], ax3d), interval=1, blit=False)
+    plt.show()
 
 def update_test_graph(num, test3d, predic, ax3d):
   ax3d.cla()

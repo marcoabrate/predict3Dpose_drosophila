@@ -21,49 +21,53 @@ import procrustes
 
 random.seed(71)
 
-DATA_DIR = "flydata/"
+CAMERA_TO_USE = 1 
+CAMERA_PROJ = CAMERA_TO_USE
+
+if CAMERA_TO_USE < 4:
+  DATA_DIR = "flydata/"
+else:
+  DATA_DIR = "calib/"
 FILES = [os.path.join(DATA_DIR, f) \
      for f in os.listdir(DATA_DIR) if os.path.isfile(os.path.join(DATA_DIR, f))]
 FILES.sort(reverse=False)
 FILE_NUM = len(FILES)
 FILE_REF = FILES[FILE_NUM-1]   
 
-ONE_FLY = True
+ONE_FLY = True 
 if ONE_FLY:
   ### selecting one fly for testing
-  TEST_FILES = FILES[3:25]
-  TRAIN_FILES = FILES[:3]+FILES[25:]
-  print(TEST_FILES)
-  print(TRAIN_FILES)
+  TEST_FILES = [FILES[FILE_NUM-1]]
+  TRAIN_FILES = FILES[:FILE_NUM-1]
   random.shuffle(TRAIN_FILES)
   random.shuffle(TEST_FILES)
   ### ------------------------- ###
 else:
   ### randomly select flis for testing
-  random.shuffle(FILES)
- 
+  random.shuffle(FILES) 
   TRAIN_NUM = int(round(0.84*FILE_NUM))
   TRAIN_FILES = FILES[:TRAIN_NUM]
   TEST_FILES = FILES[TRAIN_NUM:]
   ### ---------------------------- ###
 
-CAMERA_TO_USE = 1 
-CAMERA_PROJ = CAMERA_TO_USE
-
 DIMENSIONS = 38
 BODY_COXA = [0, 5, 10, 19, 24, 29]
 
-### LEG_TO_USE -> "0", "1", "2", "10", "20", "21", "210"
 FIRST_3_LEGS = True
+ROOT_POSITIONS = []
 if FIRST_3_LEGS:
   LEG_TO_USE = "012"
   ROOT_POSITION = 0
-  ROOT_POSITIONS = [0,5,10]
+  for i in range(3):
+    if str(i) in LEG_TO_USE:
+      ROOT_POSITIONS.append(ROOT_POSITION+i*5)
 else:
   LEG_TO_USE = "543"
   ROOT_POSITION = 19
-  ROOT_POSITIONS = [19, 24, 29]
-ROOT_POSITIONS = ROOT_POSITIONS[:len(LEG_TO_USE)]
+  for i in range(3):
+    if str(i+3) in LEG_TO_USE:
+      ROOT_POSITIONS.append(ROOT_POSITION+i*5)
+
 LEGS = [list(range(5)), list(range(5,10)), list(range(10,15)),
   list(range(19,24)), list(range(24,29)), list(range(29,34))]
 DIMENSIONS_TO_USE = []
@@ -78,7 +82,7 @@ def read_data(dir):
     except EOFError:
       return None
 
-def load_data(dim, rcams=None, camera_frame=False, origin_bc=False, changeorig=False,
+def load_data(dim, rcams=None, camera_frame=False, origin_bc=False, augment=False,
   procrustes=False, lowpass=False):
   """
   Loads data from disk, and puts it in an easy-to-acess dictionary
@@ -101,19 +105,22 @@ def load_data(dim, rcams=None, camera_frame=False, origin_bc=False, changeorig=F
   for idx, f in enumerate(FILES):
     print("[*] reading file {0}".format(f))
     if dim == 3:
-      dinit = read_data(f)['points3d']
+      d = read_data(f)['points3d']
+      dinit = d
       if camera_frame:
         d = transform_world_to_camera(dinit, rcams, CAMERA_PROJ, f)
-        #d = np.vstack((d, transform_world_to_camera(dinit, rcams, 0, f)))
-        #d = np.vstack((d, transform_world_to_camera(dinit, rcams, 2, f)))
+        if f in TRAIN_FILES and augment:
+          d = np.vstack((d, transform_world_to_camera(dinit, rcams, 0, f)))
+          d = np.vstack((d, transform_world_to_camera(dinit, rcams, 2, f)))
       if origin_bc:
         d = origin_body_coxa_3d(d)
       dics.append(d)
       dims[idx+1] = dims[idx] + d.shape[0]
     else: # dim == 2
       d = read_data(f)['points2d'][CAMERA_TO_USE]
-      #d = np.vstack((d, read_data(f)['points2d'][0]))
-      #d = np.vstack((d, read_data(f)['points2d'][2]))
+      if f in TRAIN_FILES and augment:
+        d = np.vstack((d, read_data(f)['points2d'][0]))
+        d = np.vstack((d, read_data(f)['points2d'][2]))
       if origin_bc:
         d = origin_body_coxa_2d(d)
       dics.append(d)
@@ -123,8 +130,6 @@ def load_data(dim, rcams=None, camera_frame=False, origin_bc=False, changeorig=F
   
   if dim == 3 and lowpass:
     d_data = signal_utils.filter_batch(d_data) 
-  if dim == 3 and changeorig and not origin_bc:
-    d_data = change_origin(d_data) 
 
   data = {}
   for idx, f in enumerate(FILES):
@@ -169,6 +174,22 @@ def origin_body_coxa_2d(data2d):
           data2d[i,b:b+5,coord] += (ref[coord] - data2d[i,b,coord])
   return data2d
 
+def separate_body_coxa_3d(list_of_data3d, rcams):
+  dics = []
+  for f in FILES:
+    dinit = read_data(f)['points3d']
+    d = transform_world_to_camera(dinit, rcams, CAMERA_PROJ, f)
+    dics.append(d)
+  data3d = np.vstack(dics)
+  data3d_mean = np.mean(data3d, axis=0).reshape((-1,))
+  print(data3d.shape)
+  print(list_of_data3d[0].shape)
+  exit(0)
+  for bc in BODY_COXA:
+    for d in list_of_data3d:
+      for leg in range(15):
+        d[:,bc*3+leg] += data3d_mean[bc*3+leg]
+
 def apply_procrustes(data3d):
   ground_truth = data3d[(FILE_REF)]
   for f in FILES:
@@ -195,7 +216,7 @@ def split_train_test(data, files, dim, camera_frame=False):
       dic[ (f, CAMERA_TO_USE) ] = data[(f)]     
   return dic
 
-def normalization_stats(complete_data, changeorig, dim):
+def normalization_stats(complete_data, origin_bc, dim):
   """
   Computes normalization statistics: mean and stdev, dimensions used and ignored
 
@@ -214,7 +235,7 @@ def normalization_stats(complete_data, changeorig, dim):
 
   data_mean = np.mean(complete_data, axis=0)
   data_std = np.std(complete_data, axis=0)
-  if changeorig:
+  if origin_bc:
     dtu = [x for x in DIMENSIONS_TO_USE if x not in ROOT_POSITIONS]
   else:
     dtu = DIMENSIONS_TO_USE
@@ -329,7 +350,7 @@ def project_to_cameras(poses_set, cams, ncams=4):
 
   return t2d
 
-def read_3d_data( camera_frame, rcams, origin_bc=False, changeorig=False,
+def read_3d_data( camera_frame, rcams, origin_bc=False, augment=False,
   proc_gt=-1, lowpass=False ):
   """
   Loads 3d poses, zero-centres and normalizes them
@@ -352,14 +373,14 @@ def read_3d_data( camera_frame, rcams, origin_bc=False, changeorig=False,
   print(DIMENSIONS_TO_USE)
   print()
   # Load 3d data
-  data3d = load_data( dim, rcams, camera_frame, origin_bc, changeorig, proc_gt, lowpass )
+  data3d = load_data( dim, rcams, camera_frame, origin_bc, augment, proc_gt, lowpass )
   train_set = split_train_test( data3d, TRAIN_FILES, dim, camera_frame )
   test_set  = split_train_test( data3d, TEST_FILES, dim, camera_frame )
   
   # Compute normalization statistics
   complete_train = np.copy( np.vstack( list(train_set.values()) ).reshape((-1, DIMENSIONS*3)) )
   data_mean, data_std, dim_to_ignore, dim_to_use = \
-    normalization_stats( complete_train, changeorig, dim )
+    normalization_stats( complete_train, origin_bc, dim )
   
   # Divide every dimension independently
   train_set = normalize_data( train_set, data_mean, data_std, dim_to_use, dim )
@@ -367,7 +388,7 @@ def read_3d_data( camera_frame, rcams, origin_bc=False, changeorig=False,
   
   return train_set, test_set, data_mean, data_std, dim_to_ignore, dim_to_use
 
-def read_2d_predictions(origin_bc, changeorig):
+def read_2d_predictions(origin_bc, augment):
   """
   Loads 2d data from precomputed Stacked Hourglass detections
 
@@ -383,14 +404,14 @@ def read_2d_predictions(origin_bc, changeorig):
     dim_to_use: list with the dimensions to predict
   """
   dim = 2 # reading 2d data
-  data2d = load_data( dim, origin_bc=origin_bc )
+  data2d = load_data( dim, origin_bc=origin_bc, augment=augment )
   train_set = split_train_test( data2d, TRAIN_FILES, dim )
   test_set  = split_train_test( data2d, TEST_FILES, dim )
   
   # Compute normalization statistics
   complete_train = np.copy( np.vstack( list(train_set.values()) ).reshape((-1, DIMENSIONS*2)) )
   data_mean, data_std, dim_to_ignore, dim_to_use = \
-    normalization_stats( complete_train, changeorig, dim )
+    normalization_stats( complete_train, origin_bc, dim )
   
   train_set = normalize_data( train_set, data_mean, data_std, dim_to_use, dim )
   test_set  = normalize_data( test_set,  data_mean, data_std, dim_to_use, dim )

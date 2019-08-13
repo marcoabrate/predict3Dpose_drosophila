@@ -12,48 +12,6 @@ import cv2
 import data_utils
 import viz
 
-def project_point_radial( P, R, T, f, c, k, p ):
-  """
-  Project points from 3d to 2d using camera parameters
-  including radial and tangential distortion
-
-  Args
-    P: Nx3 points in world coordinates
-    R: 3x3 Camera rotation matrix
-    T: 3x1 Camera translation parameters
-    f: (scalar) Camera focal length
-    c: 2x1 Camera center
-    k: 3x1 Camera radial distortion coefficients
-    p: 2x1 Camera tangential distortion coefficients
-  Returns
-    Proj: Nx2 points in pixel space
-    D: 1xN depth of each point in camera space
-    radial: 1xN radial distortion per point
-    tan: 1xN tangential distortion per point
-    r2: 1xN squared radius of the projected points before distortion
-  """
-
-  # P is a matrix of 3-dimensional points
-  assert len(P.shape) == 2
-  assert P.shape[1] == 3
-
-  N = P.shape[0]
-  X = R.dot( P.T - T ) # rotate and translate
-  XX = X[:2,:] / X[2,:]
-  r2 = XX[0,:]**2 + XX[1,:]**2
-
-  radial = 1 + np.einsum( 'ij,ij->j', np.tile(k,(1, N)), np.array([r2, r2**2, r2**3]) );
-  tan = p[0]*XX[1,:] + p[1]*XX[0,:]
-
-  XXX = XX * np.tile(radial+tan,(2,1)) + np.outer(np.array([p[1], p[0]]).reshape(-1), r2 )
-
-  Proj = (f * XXX) + c
-  Proj = Proj.T
-
-  D = X[2,]
-
-  return Proj, D, radial, tan, r2
-
 def world_to_camera_frame(P, R, T, intr):
   """
   Convert points from world to camera coordinates
@@ -124,16 +82,19 @@ def load_camera_params( dic, ncamera ):
     d: 6x1 Camera distortion coefficients
   """
   
-  c = dic[ncamera]
-  if len(list(c.keys())) == 0:
+  if ncamera not in dic.keys():
     return None, None, None, None, None, None
-  
+   
+  c = dic[ncamera]
   R = c['R']
   T = c['tvec'].reshape((-1,1))
   intr = c['intr']
   f = (intr[0,0]+intr[1,1])/2
   ce = intr[:2,2]
-  d = c['distort']
+  if 'distort' in c.keys():
+    d = c['distort']
+  else:
+    d = None
   
   return R, T, f, ce, d, intr
 
