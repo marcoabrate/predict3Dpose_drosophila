@@ -39,7 +39,7 @@ FILES.sort(reverse=False)
 FILE_NUM = len(FILES)
 FILE_REF = FILES[FILE_NUM-1]
 
-isTesting = False
+isTesting = True
 if isTesting:
   if CAMERA_TO_USE < 4:
     TEST_FILES = FILES[5:13]
@@ -188,7 +188,7 @@ def origin_body_coxa_2d(data2d):
 
 def separate_body_coxa_3d(list_of_data3d, rcams):
   dics = []
-  for f in FILES:
+  for f in TEST_FILES:
     dinit = read_data(f)['points3d']
     d = transform_world_to_camera(dinit, rcams, CAMERA_PROJ, f)
     dics.append(d)

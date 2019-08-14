@@ -15,8 +15,7 @@ J_r  = np.array([20,21,22,23,25,26,27,28,30,31,32,33]) # end points
 
 def get_3d_pose(channels, ax):
   cidx = 0
-  colors = ["#004100", "#009600", "#00ff00", "#410000", "#960000", "#ff0000",\
-    "#000041", "#000096", "#0000ff"]
+  colors = ["#004100", "#009600", "#00ff00", "#410000", "#960000", "#ff0000"]
   for ch in channels:
     vals = ch.reshape((-1, 3))
     for i in np.arange(len(I)):
@@ -26,7 +25,7 @@ def get_3d_pose(channels, ax):
       ax.plot(x, y, z, lw=2, c=colors[cidx])
       if (i+1)%4 == 0:
         cidx+=1
-      if cidx > 8:
+      if cidx > 5:
         cidx = 0
 
 def update_test_graph(num, test3d_l, predic_l, test3d_r, predic_r, ax3d):
@@ -36,16 +35,12 @@ def update_test_graph(num, test3d_l, predic_l, test3d_r, predic_r, ax3d):
     test3d_r[num,I_r[0]*3:].reshape((1,-1)), predic_r[num,I_r[0]*3:].reshape((1,-1))]
   get_3d_pose(channels, ax3d)
 
-LEFT_DIR = "tr_all_te3-24_200epochs_origBC_camproj_size1024_dropout0.5_0.001"
-RIGHT_DIR = "tr_all_te0-8_200epochs_origBC_size1024_dropout0.5_0.001"
+LEFT_DIR = "tr_all_te3-24_oldcam_200epochs_origBC_camproj_size1024_dropout0.5_0.001"
+RIGHT_DIR = "tr_all_te0-8_5epochs_origBC_size1024_dropout0.5_0.001"
 test3d_l = np.load(LEFT_DIR+"/test_poses3d.npy")
 predic_l = np.load(LEFT_DIR+"/test_decout.npy")
 test3d_r = np.load(RIGHT_DIR+"/test_poses3d.npy")
 predic_r = np.load(RIGHT_DIR+"/test_decout.npy")
-#test3d = np.copy(test3d_l)
-#predic = np.copy(predic_l)
-#test3d[:,I_r[0]*3:] = test3d_r[:,I_r[0]*3:]
-#predic[:,I_r[0]*3:] = predic_r[:,I_r[0]*3:]
 
 fig = plt.figure(figsize=(19.2, 10.8))
 ax3d = fig.add_subplot(111, projection='3d')

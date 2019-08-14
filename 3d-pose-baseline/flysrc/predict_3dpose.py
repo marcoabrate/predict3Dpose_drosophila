@@ -43,7 +43,7 @@ tf.app.flags.DEFINE_boolean("origin_bc", False, "Superimpose body coxas at the o
 tf.app.flags.DEFINE_boolean("augment_data", False, "Augment the data using 2 additional cameras")
 
 # Directories
-tf.app.flags.DEFINE_string("train_dir", "test", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "tr_all_te3-24", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
@@ -461,7 +461,7 @@ def sample():
     files_dim = [v.shape[0] for v in test_set_3d.values()]
     files_dim.insert(0, 0)
     
-    ''' Convert back to world coordinates
+    '''# Convert back to world coordinates
     if FLAGS.camera_frame:
       for i, f in enumerate(files):
         R, T, f, ce, d, intr = rcams[(f, data_utils.CAMERA_PROJ)]
