@@ -9,9 +9,7 @@ body_coxa_idx = [0, 5, 10, 19, 24, 29]
 def apply_transformation(pts, R=None, t=None, s=None):
     return s * np.dot(pts, R) + t
 
-
 def procrustes(pts ,template, reflection=True):
-    print(body_coxa_idx)
     template_bc = template[:,body_coxa_idx]
     pts_bc = pts[:,body_coxa_idx]
 
@@ -24,7 +22,6 @@ def procrustes(pts ,template, reflection=True):
     pts_t = apply_transformation(pts.copy(), R_b, t_b, s_b)
     
     return pts_t, tform
-
 
 def procrustes_(X, Y, scaling=True, reflection='best'):
     """

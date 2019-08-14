@@ -9,7 +9,6 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import FuncFormatter, MultipleLocator
-#from ..Config import config
 import data_utils
 
 class LowPassFilter(object):

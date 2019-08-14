@@ -26,23 +26,16 @@ TEST_COLORS = ["#000099", "#800000", "#006600"]
 def show3Dpose(channels, ax, test_colors=False):
   """
   Visualize a 3d skeleton
-
   Args
     channels: the pose to plot.
     ax: matplotlib 3d axis to draw on
-    lcolor: color for left part of the body
-    rcolor: color for right part of the body
-  Returns
-    Nothing. Draws on ax.
+    test_colors: use the color for test images
   """
   
   vals = channels[0].reshape( (-1, 3) )
   #  vals:
   #  x0  y0  z0
-  #  x1  y1  z1
-  #  x2  y2  z2
-  #  ...
-  #  x13  y13  z13
+  #  etc ...
   cidx = 0
 
   # Make connection matrix
@@ -79,23 +72,15 @@ def show3Dpose(channels, ax, test_colors=False):
 def show2Dpose(channels, ax):
   """
   Visualize a 2d skeleton
-
   Args
     channels: the pose to plot.
     ax: matplotlib axis to draw on
-    lcolor: color for left part of the body
-    rcolor: color for right part of the body
-  Returns
-    Nothing. Draws on ax.
   """
 
   vals = channels[0].reshape( (-1, 2) )
   #  vals:
   #  x0  y0
-  #  x1  y1
-  #  x2  y2
-  #  ...
-  #  x13  y13
+  #  etc ...
   cidx = 0
 
   # Make connection matrix
@@ -211,7 +196,13 @@ def update_files_graph(num, files_dim, sets3d, ax3d):
   get_3d_pose(channels, ax3d)
 
 def visualize_files_animation(train3d, test3d):
-  fig = plt.figure()
+  """
+  Visualize animation of all files on the same plot
+  Args
+    train3d: dictionary with 3d data used for training
+    test3d: dictionary with 3d data used fot testing
+  """
+  fig = plt.figure(figsize=(19.2, 10.8))
   files_dim = np.zeros((data_utils.FILE_NUM+1), dtype=int)
   values = []
   idx = 0
@@ -241,32 +232,38 @@ def visualize_files_animation(train3d, test3d):
   plt.show()
 
 def update_files_oneatatime(num, data3d, files, ax3d):
-  f = files[int(num/10)]
+  f = files[int(num/15)]
   ax3d.cla()
   ax3d.set_title(f[7:])
   channels = [ data3d[num] ]
   get_3d_pose(channels, ax3d)
 
 def visualize_files_oneatatime(train3d, test3d):
+  """
+  Visualize animation of all files one after the other
+  Args
+    train3d: dictionary with 3d data used for training
+    test3d: dictionary with 3d data used fot testing
+  """
   data3d = []
   files = []
   for k in train3d.keys():
     f, _ = k
-    data3d.append(train3d[k][:10])
+    data3d.append(train3d[k][:15])
     files.append(f)
   for k in test3d.keys():
     f, _ = k
-    data3d.append(test3d[k][:10])
+    data3d.append(test3d[k][:15])
     files.append(f)
   data3d = np.vstack(data3d)
 
-  fig = plt.figure()
+  fig = plt.figure(figsize=(19.2, 10.8))
   ax3d = fig.add_subplot(111, projection='3d')
   ax3d.set_title(files[0])
   channels = [ data3d[0] ]
   get_3d_pose(channels, ax3d)
-  ani = animation.FuncAnimation(fig, update_files_oneatatime, len(files)*10,
-    fargs=(data3d, files, ax3d), interval=5, blit=False)
+  ani = animation.FuncAnimation(fig, update_files_oneatatime, len(files)*15,
+    fargs=(data3d, files, ax3d), interval=10, blit=False)
   plt.show()
 
 def update_test_graph(num, test3d, predic, ax3d):
@@ -276,7 +273,13 @@ def update_test_graph(num, test3d, predic, ax3d):
   get_3d_pose(channels, ax3d)
 
 def visualize_test_animation(test3d, predic):
-  fig = plt.figure()
+  """
+  Visualize animation of the test and predicted data, on the same plot
+  Args
+    test3d: 3d data used fot testing
+    predic: predicted 3d data
+  """
+  fig = plt.figure(figsize=(19.2, 10.8))
   ax3d = fig.add_subplot(111, projection='3d')
   ax3d.set_title("prediction in RED 0")
   channels = [test3d[0].reshape((1,-1)), predic[0].reshape((1,-1))]

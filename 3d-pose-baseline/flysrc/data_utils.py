@@ -21,7 +21,7 @@ import procrustes
 
 random.seed(71)
 
-CAMERA_TO_USE = 1 
+CAMERA_TO_USE = 1
 CAMERA_PROJ = CAMERA_TO_USE
 
 if CAMERA_TO_USE < 4:
@@ -37,30 +37,33 @@ if CAMERA_TO_USE > 3:
 
 FILES.sort(reverse=False)
 FILE_NUM = len(FILES)
-FILE_REF = FILES[FILE_NUM-1]   
+FILE_REF = FILES[FILE_NUM-1]
 
-ONE_FLY = True 
-if ONE_FLY:
+isTesting = False
+if isTesting:
+  if CAMERA_TO_USE < 4:
+    TEST_FILES = FILES[5:13]
+    TRAIN_FILES = FILES[:3]+FILES[24:]
+  else:
+    TEST_FILES = FILES[:8]
+    TRAIN_FILES = FILES[8:]
+else:
   ### selecting one fly for testing
-  TEST_FILES = FILES[3:24]
-  TRAIN_FILES = FILES[:3]+FILES[24:]
+  if CAMERA_TO_USE < 4:
+    TEST_FILES = FILES[3:24]
+    TRAIN_FILES = FILES[:3]+FILES[24:]
+  else:
+    TEST_FILES = FILES[:8]
+    TRAIN_FILES = FILES[8:]
   random.shuffle(TRAIN_FILES)
   random.shuffle(TEST_FILES)
   ### ------------------------- ###
-else:
-  ### randomly select flis for testing
-  random.shuffle(FILES) 
-  TRAIN_NUM = int(round(0.84*FILE_NUM))
-  TRAIN_FILES = FILES[:TRAIN_NUM]
-  TEST_FILES = FILES[TRAIN_NUM:]
-  ### ---------------------------- ###
 
 DIMENSIONS = 38
 BODY_COXA = [0, 5, 10, 19, 24, 29]
 
-FIRST_3_LEGS = True
 ROOT_POSITIONS = []
-if FIRST_3_LEGS:
+if CAMERA_TO_USE < 4:
   LEG_TO_USE = "012"
   ROOT_POSITION = 0
   for i in range(3):
@@ -91,18 +94,21 @@ def load_data(dim, rcams=None, camera_frame=False, origin_bc=False, augment=Fals
   procrustes=False, lowpass=False):
   """
   Loads data from disk, and puts it in an easy-to-acess dictionary
-
   Args
     dim: Integer={2,3}. Load 2 or 3-dimensional data
-    rcams:
-    camera_frame:
-    origin_bc:
-    changeorig: whether to change origin of the system to ROOT_POSITION
-    procrustes:
-    lowpass:
-  Returns:
-    data: Dictionary with keys k=(subject, 0)
-      values: matrix (38, 3) with the 3d points data
+    rcams: dictionary (file, ncamera) with camera information
+    camera_frame: project to camera coordinates
+    origin_bc: origin in BODY COXAS
+    augment: augment data adding two more projections to lateral cameras
+    procrustes: apply procrustes analysis for all BODY COXA
+    lowpass: lowpass data to smooth movements
+  Returns
+    dim = 3
+      data: dictionary with keys k=(file, camera_proj)
+        values: matrix (N, 38, 3) with 3d points data
+    dim = 2
+      data: dictionary with keys k=(file, camera_to_use)
+        values: matrix (N, 38, 3) with 2d points data
   """
 
   dics = []
@@ -150,10 +156,11 @@ def transform_world_to_camera(t3d_world, rcams, ncam, f):
   Project 3d poses from world coordinate to camera coordinate system
   Args
     t3d_world: matrix Nx with 3d poses in world coordinates
-    rcams: dictionary with cameras
-  Return:
-    t3d_camera: dictionary with keys (subject, camera)
-      with 3d poses in camera coordinate
+    rcams: dictionary (file, ncamera) with camera information
+    ncam: number of camera to project to
+    f: file name
+  Return
+    t3d_camera: matrix with 3d poses in camera coordinate
   """
   t3d_camera = np.zeros(t3d_world.shape)
   R, T, _, _, _, intr = rcams[ (f, ncam) ]
@@ -204,13 +211,13 @@ def apply_procrustes(data3d):
     pts_t, d = procrustes.procrustes(data3d[(f)], ground_truth, False)
     data3d[(f)] = pts_t
   return data3d
- 
+''' 
 def change_origin(data3d):
   for i in range(data3d.shape[0]):
     for coord in range(3):
       data3d[i,:,coord] -= data3d[i,ROOT_POSITION,coord]
   return data3d
-
+'''
 def split_train_test(data, files, dim, camera_frame=False):
   dic = {}
   for f in files:
@@ -225,10 +232,9 @@ def split_train_test(data, files, dim, camera_frame=False):
 def normalization_stats(complete_data, origin_bc, dim):
   """
   Computes normalization statistics: mean and stdev, dimensions used and ignored
-
   Args
-    complete_data: nxd np array with poses
-    changeorig: do we have a root position?
+    complete_data: Nxd matrix with poses
+    origin_bc: origin in BODY COXAS
     dim: integer={2,3} dimensionality of the data
   Returns
     data_mean: np vector with the mean of the data
@@ -259,7 +265,6 @@ def normalization_stats(complete_data, origin_bc, dim):
 def normalize_data(data, data_mean, data_std, dim_to_use, dim):
   """
   Normalizes a dictionary of poses
-
   Args
     data: dictionary where values are
     data_mean: np vector with the mean of the data
@@ -283,7 +288,6 @@ def normalize_data(data, data_mean, data_std, dim_to_use, dim):
 def unNormalize_dic(data, data_mean, data_std, dim_to_use):
   """
   unNormalizes a dictionary of poses
-
   Args
     data: dictionary where values are
     data_mean: np vector with the mean of the data
@@ -305,7 +309,6 @@ def unNormalize_batch(normalized_data, data_mean, data_std, dim_to_use):
   """
   Un-normalizes a matrix whose mean has been substracted and that has been divided by
   standard deviation. Some dimensions might also be missing
-
   Args
     normalized_data: nxd matrix to unnormalize
     data_mean: np vector with the mean of the data
@@ -328,11 +331,10 @@ def unNormalize_batch(normalized_data, data_mean, data_std, dim_to_use):
   orig_data = np.multiply(orig_data, stdMat) + meanMat
   
   return orig_data
-
+'''
 def project_to_cameras(poses_set, cams, ncams=4):
   """
   Project 3d poses using camera parameters
-
   Args
     poses_set: dictionary with 3d poses
     cams: dictionary with camera parameters
@@ -355,15 +357,18 @@ def project_to_cameras(poses_set, cams, ncams=4):
       t2d[ (subj, a, sname) ] = pts2d
 
   return t2d
-
+'''
 def read_3d_data( camera_frame, rcams, origin_bc=False, augment=False,
-  proc_gt=-1, lowpass=False ):
+  procrustes=False, lowpass=False ):
   """
   Loads 3d poses, zero-centres and normalizes them
-
-  Args
-   transform_world_to_camera(poses_set, rcams, f): camera_frame: boolean. Whether to convert the data to camera coordinates
-    rcams: dictionary with camera parameters
+  Args 
+    camera_frame: project to camera coordinates
+    rcams: dictionary (file, ncamera) with camera information
+    origin_bc: origin in BODY COXAS
+    augment: augment data adding two more projections to lateral cameras
+    procrustes: apply procrustes analysis for all BODY COXA
+    lowpass: lowpass data to smooth movements
   Returns
     train_set: dictionary with loaded 3d poses for training
     test_set: dictionary with loaded 3d poses for testing
@@ -371,15 +376,13 @@ def read_3d_data( camera_frame, rcams, origin_bc=False, augment=False,
     data_std: vector with the standard deviation of the 3d training data
     dim_to_ignore: list with the dimensions to not predict
     dim_to_use: list with the dimensions to predict
-    train_root_positions: dictionary with the 3d positions of the root in train
-    test_root_positions: dictionary with the 3d positions of the root in test
   """
   dim = 3 # reading 3d data
   print("\n[*] dimensions to use: ")
   print(DIMENSIONS_TO_USE)
   print()
   # Load 3d data
-  data3d = load_data( dim, rcams, camera_frame, origin_bc, augment, proc_gt, lowpass )
+  data3d = load_data( dim, rcams, camera_frame, origin_bc, augment, procrustes, lowpass )
   train_set = split_train_test( data3d, TRAIN_FILES, dim, camera_frame )
   test_set  = split_train_test( data3d, TEST_FILES, dim, camera_frame )
   
@@ -397,10 +400,9 @@ def read_3d_data( camera_frame, rcams, origin_bc=False, augment=False,
 def read_2d_predictions(origin_bc, augment):
   """
   Loads 2d data from precomputed Stacked Hourglass detections
-
   Args
-    origin_bc:
-    changeorig: change the origin of the system to ROOT_POSITION
+    origin_bc: origin in BODY COXAS
+    augment: augment data adding two more projections to lateral cameras
   Returns
     train_set: dictionary with loaded 2d stacked hourglass detections for training
     test_set: dictionary with loaded 2d stacked hourglass detections for testing

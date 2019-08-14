@@ -43,7 +43,7 @@ tf.app.flags.DEFINE_boolean("origin_bc", False, "Superimpose body coxas at the o
 tf.app.flags.DEFINE_boolean("augment_data", False, "Augment the data using 2 additional cameras")
 
 # Directories
-tf.app.flags.DEFINE_string("train_dir", "tr_all_te3-24", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "test", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
@@ -80,7 +80,6 @@ os.system('mkdir -p {}'.format(summaries_dir))
 def create_model( session, batch_size ):
   """
   Create model and initialize it or load its parameters in a session
-
   Args
     session: tensorflow session
     batch_size: integer. Number of examples in each batch
@@ -136,20 +135,6 @@ def train():
 
   # Load camera parameters
   rcams = cameras.load_cameras()
-  
-  print("Cameras dic:")
-  Rs = []
-  Ts = []
-  intrs = []
-  for k in rcams.keys():
-    (f, c) = k
-    if c == 1:
-      R, T, f, ce, d, intr = rcams[k]
-      Rs.append(R)
-      Ts.append(T)
-      intrs.append(intr)
-  print(np.var(Rs, axis=0))
-  print(np.mean(Rs, axis=0))
 
   # Load 3d data and 2d projections
   full_train_set_3d, full_test_set_3d, data_mean_3d, data_std_3d, dim_to_ignore_3d, dim_to_use_3d =\
@@ -316,27 +301,6 @@ def evaluate_batches( sess, model,
   """
   Generic method that evaluates performance of a list of batches.
   May be used to evaluate all actions or a single action.
-
-  Args
-    sess
-    model
-    data_mean_3d
-    data_std_3d
-    dim_to_use_3d
-    dim_to_ignore_3d
-    data_mean_2d
-    data_std_2d
-    dim_to_use_2d
-    dim_to_ignore_2d
-    current_step
-    encoder_inputs
-    decoder_outputs
-    current_epoch
-  Returns
-    total_err
-    joint_err
-    step_time
-    loss
   """
 
   n_joints = len( data_utils.DIMENSIONS_TO_USE ) - len( data_utils.ROOT_POSITIONS)
@@ -394,8 +358,6 @@ def evaluate_batches( sess, model,
   return total_err, coordwise_err, joint_err, step_time, loss
 
 def sample():
-  """Get samples from a model and visualize them"""
-
   # Load camera parameters
   rcams = cameras.load_cameras()
 
@@ -480,15 +442,17 @@ def sample():
     joint_err = np.mean( all_dists, axis=0 )
     coordwise_err = np.mean(np.vstack(diff_coordwise).reshape((-1,3)), axis=0)
     total_err = np.mean( all_dists )
-    print("=============================\n"
-          "Val error avg (mm):  %.2f (%.2f, %.2f, %.2f)\n"
-          "=============================" % ( total_err,
-      coordwise_err[0], coordwise_err[1], coordwise_err[2] ))
+    print_ = "=============================\n" \
+      "Val error avg (mm):  %.2f (%.2f, %.2f, %.2f)\n" \
+      "=============================\n" % ( total_err,
+      coordwise_err[0], coordwise_err[1], coordwise_err[2] )
 
     for i in range(n_joints):
-      print("Error in joint {0:02d} (mm): {1:>5.2f}".format(i+1, joint_err[i]))
-    print("=============================")
-
+      print_ += "Error in joint {0:02d} (mm): {1:>5.2f}\n".format(i+1, joint_err[i])
+    print_ += "============================="
+    with open(train_dir+"/info.txt", "w+") as f:
+      f.write(print_)   
+    print(print_)
  
     # Put all the poses together
     enc_in, dec_out, poses3d = map( np.vstack, [all_enc_in, all_dec_out, all_poses3d] )
@@ -496,8 +460,8 @@ def sample():
     files = [k[0] for k in test_set_3d.keys()]
     files_dim = [v.shape[0] for v in test_set_3d.values()]
     files_dim.insert(0, 0)
-    '''
-    # Convert back to world coordinates
+    
+    ''' Convert back to world coordinates
     if FLAGS.camera_frame:
       for i, f in enumerate(files):
         R, T, f, ce, d, intr = rcams[(f, data_utils.CAMERA_PROJ)]
@@ -514,6 +478,8 @@ def sample():
     '''
     if FLAGS.origin_bc:
       data_utils.separate_body_coxa_3d([dec_out, poses3d], rcams) 
+    np.save(train_dir+"/test_decout.npy", dec_out)
+    np.save(train_dir+"/test_poses3d.npy", poses3d)
     viz.visualize_test_sample(enc_in, dec_out, poses3d)
     viz.visualize_test_animation(dec_out, poses3d)
 
