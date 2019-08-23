@@ -19,27 +19,29 @@ import sys
 import signal_utils
 import procrustes
 
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+
 random.seed(71)
 
 CAMERA_TO_USE = 1
 CAMERA_PROJ = CAMERA_TO_USE
 
+FILES_CALIB = [os.path.join("calib/", f) \
+     for f in os.listdir("calib/") if os.path.isfile(os.path.join("calib/", f))]
+FILES_NORM = [os.path.join("flydata/", f) \
+     for f in os.listdir("flydata/") if os.path.isfile(os.path.join("flydata/", f))]
+for i, f in enumerate(FILES_CALIB):
+  FILES_CALIB[i] = f.replace("calib/calib", "flydata/pose_result")
 if CAMERA_TO_USE < 4:
-  DATA_DIR = "flydata/"
+  FILES = FILES_NORM
 else:
-  DATA_DIR = "calib/"
-FILES = [os.path.join(DATA_DIR, f) \
-     for f in os.listdir(DATA_DIR) if os.path.isfile(os.path.join(DATA_DIR, f))]
+  FILES = FILES_CALIB
 
-if CAMERA_TO_USE > 3:
-  for i, f in enumerate(FILES):
-    FILES[i] = f.replace("calib/calib", "flydata/pose_result")
-
-FILES.sort(reverse=False)
 FILE_NUM = len(FILES)
 FILE_REF = FILES[FILE_NUM-1]
 
-isTesting = True
+isTesting = False
 if isTesting:
   if CAMERA_TO_USE < 4:
     TEST_FILES = FILES[5:13]
@@ -202,6 +204,22 @@ def separate_body_coxa_3d(list_of_data3d, rcams):
   for d in list_of_data3d:
     d[:,:15*3] += dists[:15*3]
     d[:,19*3:19*3+15*3] += dists[15*3:]
+
+def separate_body_coxa_2d(data2d):
+  dics = []
+  for f in TEST_FILES:
+    d = read_data(f)['points2d'][CAMERA_TO_USE]
+    dics.append(d)
+  d2d = np.vstack(dics)
+  ref = np.mean(d2d[:,ROOT_POSITION], axis=0)
+  for bc in BODY_COXA:
+    if bc != ROOT_POSITION:
+      dists = []
+      for i in range(5):
+        dists.append(ref - np.mean(d2d[:,bc], axis=0))
+      dists = np.hstack(dists)
+      data2d[:,bc*2:bc*2+5*2] -= dists
+  return data2d
 
 def apply_procrustes(data3d):
   ground_truth = data3d[(FILE_REF)]

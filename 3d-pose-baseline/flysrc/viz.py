@@ -12,6 +12,7 @@ import sys
 import random
 
 import data_utils
+import signal_utils
 
 if data_utils.CAMERA_TO_USE < 4:
   I  = np.array([0,1,2,3,5,6,7,8,10,11,12,13]) # start points
@@ -183,8 +184,9 @@ def visualize_test_sample(test2d, test3d, predic):
     show3Dpose( p3d, ax3, test_colors=True )
 
     subplot_idx += 3
-
+  
   plt.show()
+
   return random_subjs
 
 def update_files_graph(num, files_dim, sets3d, ax3d):
@@ -232,9 +234,15 @@ def visualize_files_animation(train3d, test3d):
   plt.show()
 
 def update_files_oneatatime(num, data3d, files, ax3d):
-  f = files[int(num/15)]
+  f = files[int(num/100)]
   ax3d.cla()
-  ax3d.set_title(f[7:])
+  title = f[7:]
+  if f in data_utils.FILES_CALIB:
+    title += "\nCalib"
+  ax3d.set_title(title)
+  ax3d.set_xlim([-2, 2])
+  ax3d.set_ylim([-2, 0])
+  ax3d.set_zlim([-1, 0.5])
   channels = [ data3d[num] ]
   get_3d_pose(channels, ax3d)
 
@@ -249,11 +257,11 @@ def visualize_files_oneatatime(train3d, test3d):
   files = []
   for k in train3d.keys():
     f, _ = k
-    data3d.append(train3d[k][:15])
+    data3d.append(train3d[k][:100])
     files.append(f)
   for k in test3d.keys():
     f, _ = k
-    data3d.append(test3d[k][:15])
+    data3d.append(test3d[k][:100])
     files.append(f)
   data3d = np.vstack(data3d)
 
@@ -262,7 +270,7 @@ def visualize_files_oneatatime(train3d, test3d):
   ax3d.set_title(files[0])
   channels = [ data3d[0] ]
   get_3d_pose(channels, ax3d)
-  ani = animation.FuncAnimation(fig, update_files_oneatatime, len(files)*15,
+  ani = animation.FuncAnimation(fig, update_files_oneatatime, len(files)*100,
     fargs=(data3d, files, ax3d), interval=10, blit=False)
   plt.show()
 
@@ -270,6 +278,9 @@ def update_test_graph(num, test3d, predic, ax3d):
   ax3d.cla()
   ax3d.set_title("prediction in RED {0}".format(num))
   channels = [test3d[num].reshape((1,-1)), predic[num].reshape((1,-1))]
+  ax3d.set_xlim([-2, 2])
+  ax3d.set_ylim([-2, 0])
+  ax3d.set_zlim([-1, 0.5])
   get_3d_pose(channels, ax3d)
 
 def visualize_test_animation(test3d, predic):
@@ -279,6 +290,8 @@ def visualize_test_animation(test3d, predic):
     test3d: 3d data used fot testing
     predic: predicted 3d data
   """
+  test3d = signal_utils.filter_batch(test3d.reshape((-1,data_utils.DIMENSIONS,3)))
+  predic = signal_utils.filter_batch(predic.reshape((-1,data_utils.DIMENSIONS,3)))
   fig = plt.figure(figsize=(19.2, 10.8))
   ax3d = fig.add_subplot(111, projection='3d')
   ax3d.set_title("prediction in RED 0")

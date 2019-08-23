@@ -12,6 +12,7 @@ import sys
 import time
 import h5py
 import copy
+import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -209,7 +210,7 @@ def train():
     step_time, loss = 0, 0
     current_epoch = 0
     log_every_n_batches = 50
-
+    losses, errors, joint_errors = [], [], []
     for _ in range( FLAGS.epochs ):
       current_epoch = current_epoch + 1
 
@@ -219,7 +220,6 @@ def train():
       nbatches = len( encoder_inputs )
       print("[*] there are {0} train batches".format( nbatches ))
       start_time, loss = time.time(), 0.
-
       # === Loop through all the training batches ===
       for i in range( nbatches ):
 
@@ -244,6 +244,7 @@ def train():
         # === end looping through training batches ===
 
       loss = loss / nbatches
+      losses.append(loss)
       print("=============================\n"
             "Global step:         %d\n"
             "Learning rate:       %.2e\n"
@@ -278,7 +279,8 @@ def train():
         # 6 spaces, right-aligned, 5 decimal places
         print("Error in joint {0:02d} (mm): {1:>5.2f}".format(i+1, joint_err[i]))
       print("=============================")
-
+      errors.append(coordwise_err)
+      joint_errors.append(joint_err)
       # Log the error to tensorboard
       summaries = sess.run( model.err_mm_summary, {model.err_mm: total_err} )
       model.test_writer.add_summary( summaries, current_step )
@@ -293,6 +295,15 @@ def train():
       step_time, loss = 0, 0
 
       sys.stdout.flush()
+    print(losses)
+    print(errors)
+    print(joint_errors)
+    def print_list_tofile(l, filename):
+      with open(filename, 'wb') as f:
+        pickle.dump(l, f)
+    print_list_tofile(losses, train_dir+"/losses.pkl")
+    print_list_tofile(errors, train_dir+"/errors.pkl")
+    print_list_tofile(joint_errors, train_dir+"/joint_errors.pkl")
 
 def evaluate_batches( sess, model,
   data_mean_3d, data_std_3d, dim_to_use_3d, dim_to_ignore_3d,
@@ -476,7 +487,9 @@ def sample():
         dec_out[s:e] = cam2world_centered(dec_out[s:e])
         poses3d[s:e] = cam2world_centered(poses3d[s:e])
     '''
+    # separate body coxas again for visualization purposes
     if FLAGS.origin_bc:
+      data_utils.separate_body_coxa_2d(enc_in)
       data_utils.separate_body_coxa_3d([dec_out, poses3d], rcams) 
     np.save(train_dir+"/test_decout.npy", dec_out)
     np.save(train_dir+"/test_poses3d.npy", poses3d)

@@ -27,11 +27,11 @@ def world_to_camera_frame(P, R, T, intr):
   assert len(P.shape) == 2
   assert P.shape[1] == 3
   
-  #P = np.vstack(( P.T, np.ones((1,P.shape[0])) ))
-  #Rt = np.hstack((R, T))
-  #proj = Rt.dot(P)
+  P = np.vstack(( P.T, np.ones((1,P.shape[0])) ))
+  Rt = np.hstack((R, T))
+  proj = Rt.dot(P)
   
-  proj = R.dot(P.T - T)
+  #proj = R.dot(P.T - T)
   ''' Convert to pixels
   pixels = intr.dot(proj)
   pixels = pixels[:2,:] / pixels[2,:]
