@@ -62,9 +62,6 @@ def show3Dpose(channels, ax, test_colors=False):
 
   # Get rid of the panes (actually, make them white)
   white = (1.0, 1.0, 1.0, 0.0)
-  #ax.w_xaxis.set_pane_color(white)
-  #ax.w_yaxis.set_pane_color(white)
-
   # Get rid of the lines in 3d
   ax.w_xaxis.line.set_color(white)
   ax.w_yaxis.line.set_color(white)
@@ -230,15 +227,6 @@ def visualize_files_oneatatime(train3d, test3d):
     fargs=(data3d, files, ax3d), interval=10, blit=False)
   plt.show()
 
-def update_test_graph(num, test3d, predic, ax3d):
-  ax3d.cla()
-  ax3d.set_title("prediction in RED {0}".format(num))
-  channels = [test3d[num].reshape((1,-1)), predic[num].reshape((1,-1))]
-  ax3d.set_xlim([-2, 2])
-  ax3d.set_ylim([-2, 0])
-  ax3d.set_zlim([-1, 0.5])
-  get_3d_pose(channels, ax3d)
-
 def visualize_test_animation(test3d, predic):
   """
   Visualize animation of the test and predicted data, on the same plot
@@ -248,18 +236,29 @@ def visualize_test_animation(test3d, predic):
   """
   test3d = signal_utils.filter_batch(test3d.reshape((-1,data_utils.DIMENSIONS,3)))
   predic = signal_utils.filter_batch(predic.reshape((-1,data_utils.DIMENSIONS,3)))
-  fig = plt.figure(figsize=(19.2, 10.8))
-  ax3d = fig.add_subplot(111, projection='3d')
-  ax3d.set_title("prediction in RED 0")
-  channels = [test3d[0].reshape((1,-1)), predic[0].reshape((1,-1))]
-  get_3d_pose(channels, ax3d)
+  N = 10
+  dim = int(test3d.shape[0]/N)
+  for i in range(N):
+    fig = plt.figure()
+    ax3d = fig.add_subplot(111, projection='3d')
+    ax3d.set_title("prediction in RED 0")
+    channels = [test3d[dim*i].reshape((1,-1)), predic[dim*i].reshape((1,-1))]
+    get_3d_pose(channels, ax3d)
+    ani = animation.FuncAnimation(fig, update_test_animation, dim,
+      fargs=(test3d[dim*i:dim*(i+1)], predic[dim*i:dim*(i+1)], ax3d), interval=1, blit=False)
+    Writer = animation.writers['ffmpeg']
+    writer = Writer(fps=15, bitrate=1800)
+    ani.save("predictions%d.mp4"%i, writer=writer)
+    plt.show()
 
-  ani = animation.FuncAnimation(fig, update_test_graph, test3d.shape[0],
-    fargs=(test3d, predic, ax3d), interval=10, blit=False)
-  Writer = animation.writers['ffmpeg']
-  writer = Writer(fps=15, bitrate=1800)
-  #ani.save('predictions.mp4', writer=writer)
-  plt.show()
+def update_test_animation(num, test3d, predic, ax3d):
+  ax3d.cla()
+  ax3d.set_title("prediction in RED {0}".format(num))
+  channels = [test3d[num].reshape((1,-1)), predic[num].reshape((1,-1))]
+  ax3d.set_xlim([-2, 2])
+  ax3d.set_ylim([-2, 0])
+  ax3d.set_zlim([-1, 0.5])
+  get_3d_pose(channels, ax3d)
 
 def get_3d_pose(channels, ax):
   cidx = 0
@@ -276,26 +275,21 @@ def get_3d_pose(channels, ax):
         cidx+=1
       if cidx > 8:
         cidx = 0
-
-def get_2d_pose(channel, ax):
-  vals = channel.reshape((-1, 2))  
-  cidx = 0
-
-  # Make connection matrix
-  for i in np.arange( len(I) ):
-    x, y = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(2)]
-    ax.plot(x, y, lw=2, c=COLORS[cidx])
-    if (i+1)%4 == 0:
-      cidx += 1
-
-  # Get rid of the ticks
+  # Get rid of the ticks and tick labels
   ax.set_xticks([])
   ax.set_yticks([])
-  # Get rid of tick labels
+  ax.set_zticks([])
   ax.get_xaxis().set_ticklabels([])
   ax.get_yaxis().set_ticklabels([])
-  ax.set_xlim(0, 960)
-  ax.set_ylim(0, 480)
+  ax.set_zticklabels([])
 
-  ax.set_aspect('equal')
-  ax.invert_yaxis()
+  # Get rid of the panes (actually, make them white)
+  white = (1.0, 1.0, 1.0, 0.0)
+  ax.w_xaxis.set_pane_color(white)
+  ax.w_yaxis.set_pane_color(white)
+  # Get rid of the lines in 3d
+  ax.w_xaxis.line.set_color(white)
+  ax.w_yaxis.line.set_color(white)
+  ax.w_zaxis.line.set_color(white)
+
+
