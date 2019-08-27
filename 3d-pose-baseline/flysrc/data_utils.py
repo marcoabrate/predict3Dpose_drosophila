@@ -29,37 +29,32 @@ CAMERA_PROJ = CAMERA_TO_USE
 
 FILES_CALIB = [os.path.join("calib/", f) \
      for f in os.listdir("calib/") if os.path.isfile(os.path.join("calib/", f))]
-FILES_NORM = [os.path.join("flydata/", f) \
-     for f in os.listdir("flydata/") if os.path.isfile(os.path.join("flydata/", f))]
+FILES_CALIB.sort()
+TRAIN_FILES = [os.path.join("flydata_train/", f) \
+     for f in os.listdir("flydata_train/") if os.path.isfile(os.path.join("flydata_train/", f))]
+TRAIN_FILES.sort()
+TEST_FILES = [os.path.join("flydata_test/", f) \
+     for f in os.listdir("flydata_test/") if os.path.isfile(os.path.join("flydata_test/", f))]
+TEST_FILES.sort()
 for i, f in enumerate(FILES_CALIB):
   FILES_CALIB[i] = f.replace("calib/calib", "flydata/pose_result")
 if CAMERA_TO_USE < 4:
-  FILES = FILES_NORM
+  FILES = TRAIN_FILES + TEST_FILES
 else:
   FILES = FILES_CALIB
-
+  TEST_FILES = FILES[:8]
+  TRAIN_FILES = FILES[8:]
+for f in TRAIN_FILES:
+  print(f[14:].replace("_", "\\_")+"\\\\")
+print()
+for f in TEST_FILES:
+  print(f[13:].replace("_", "\\_")+"\\\\") 
+exit(0)
 FILE_NUM = len(FILES)
 FILE_REF = FILES[FILE_NUM-1]
 
-isTesting = False
-if isTesting:
-  if CAMERA_TO_USE < 4:
-    TEST_FILES = FILES[5:13]
-    TRAIN_FILES = FILES[:3]+FILES[24:]
-  else:
-    TEST_FILES = FILES[:8]
-    TRAIN_FILES = FILES[8:]
-else:
-  ### selecting one fly for testing
-  if CAMERA_TO_USE < 4:
-    TEST_FILES = FILES[3:24]
-    TRAIN_FILES = FILES[:3]+FILES[24:]
-  else:
-    TEST_FILES = FILES[:8]
-    TRAIN_FILES = FILES[8:]
-  random.shuffle(TRAIN_FILES)
-  random.shuffle(TEST_FILES)
-  ### ------------------------- ###
+random.shuffle(TRAIN_FILES)
+random.shuffle(TEST_FILES)
 
 DIMENSIONS = 38
 BODY_COXA = [0, 5, 10, 19, 24, 29]
@@ -222,6 +217,9 @@ def separate_body_coxa_2d(data2d):
   return data2d
 
 def apply_procrustes(data3d):
+  """
+    Superimpose data to one reference file FILE_REF
+  """
   ground_truth = data3d[(FILE_REF)]
   for f in FILES:
     if f is FILE_REF:
@@ -229,13 +227,7 @@ def apply_procrustes(data3d):
     pts_t, d = procrustes.procrustes(data3d[(f)], ground_truth, False)
     data3d[(f)] = pts_t
   return data3d
-''' 
-def change_origin(data3d):
-  for i in range(data3d.shape[0]):
-    for coord in range(3):
-      data3d[i,:,coord] -= data3d[i,ROOT_POSITION,coord]
-  return data3d
-'''
+
 def split_train_test(data, files, dim, camera_frame=False):
   dic = {}
   for f in files:
@@ -349,33 +341,7 @@ def unNormalize_batch(normalized_data, data_mean, data_std, dim_to_use):
   orig_data = np.multiply(orig_data, stdMat) + meanMat
   
   return orig_data
-'''
-def project_to_cameras(poses_set, cams, ncams=4):
-  """
-  Project 3d poses using camera parameters
-  Args
-    poses_set: dictionary with 3d poses
-    cams: dictionary with camera parameters
-    ncams: number of cameras per subject
-  Returns
-    t2d: dictionary with 2d poses
-  """
-  t2d = {}
 
-  for t3dk in sorted( poses_set.keys() ):
-    subj, a, seqname = t3dk
-    t3d = poses_set[ t3dk ]
-
-    for cam in range( ncams ):
-      R, T, f, c, k, p, name = cams[ (subj, cam+1) ]
-      pts2d, _, _, _, _ = cameras.project_point_radial( np.reshape(t3d, [-1, 3]), R, T, f, c, k, p )
-
-      pts2d = np.reshape( pts2d, [-1, len(H36M_NAMES)*2] )
-      sname = seqname[:-3]+"."+name+".h5" # e.g.: Waiting 1.58860488.h5
-      t2d[ (subj, a, sname) ] = pts2d
-
-  return t2d
-'''
 def read_3d_data( camera_frame, rcams, origin_bc=False, augment=False,
   procrustes=False, lowpass=False ):
   """

@@ -189,50 +189,6 @@ def visualize_test_sample(test2d, test3d, predic):
 
   return random_subjs
 
-def update_files_graph(num, files_dim, sets3d, ax3d):
-  ax3d.cla()
-  ax3d.set_title("3D pose {0}".format(num))
-  channels = []
-  for d in files_dim:
-    channels.append(sets3d[d+num].reshape((1,-1)))
-  get_3d_pose(channels, ax3d)
-
-def visualize_files_animation(train3d, test3d):
-  """
-  Visualize animation of all files on the same plot
-  Args
-    train3d: dictionary with 3d data used for training
-    test3d: dictionary with 3d data used fot testing
-  """
-  fig = plt.figure(figsize=(19.2, 10.8))
-  files_dim = np.zeros((data_utils.FILE_NUM+1), dtype=int)
-  values = []
-  idx = 0
-  for v in train3d.values():
-    files_dim[idx+1] = files_dim[idx] + v.shape[0]
-    values.append(v)
-    idx += 1
-  for v in test3d.values():
-    files_dim[idx+1] = files_dim[idx] + v.shape[0]
-    values.append(v)
-    idx += 1
-  files_dim = files_dim[:-1]
-  sets3d = np.copy( np.vstack( values ) )
-  ax3d = fig.add_subplot(111, projection='3d')
-  
-  ax3d.set_title("3D pose")
-  channels = []
-  for d in files_dim:
-    channels.append(sets3d[d].reshape((1,-1)))
-  get_3d_pose(channels, ax3d)
-
-  ani = animation.FuncAnimation(fig, update_files_graph, min(files_dim[1:])-1,
-    fargs=(files_dim, sets3d, ax3d), interval=10, blit=False)
-  Writer = animation.writers['ffmpeg']
-  writer = Writer(fps=15, bitrate=1800)
-  #ani.save('predictions.mp4', writer=writer)
-  plt.show()
-
 def update_files_oneatatime(num, data3d, files, ax3d):
   f = files[int(num/100)]
   ax3d.cla()

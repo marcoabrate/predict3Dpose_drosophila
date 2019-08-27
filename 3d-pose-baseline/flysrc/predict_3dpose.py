@@ -44,10 +44,10 @@ tf.app.flags.DEFINE_boolean("origin_bc", False, "Superimpose body coxas at the o
 tf.app.flags.DEFINE_boolean("augment_data", False, "Augment the data using 2 additional cameras")
 
 # Directories
-tf.app.flags.DEFINE_string("train_dir", "tr_all_te3-24", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "test", "Training directory.")
 
 # Train or load
-tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
+tf.app.flags.DEFINE_boolean("test", False, "Set to True for testing.")
 tf.app.flags.DEFINE_boolean("use_cpu", False, "Whether to use the CPU")
 tf.app.flags.DEFINE_integer("load", 0, "Try to load a previous checkpoint.")
 
@@ -147,7 +147,7 @@ def train():
     data_utils.read_2d_predictions( FLAGS.origin_bc, FLAGS.augment_data )
   
   print("\n[+] done reading and normalizing data")
-
+  # Getting the number of training and test subjects
   tr_subj = 0
   for v in full_train_set_3d.values():
     tr_subj += v.shape[0]
@@ -157,15 +157,15 @@ def train():
   print("{0} training subjects, {1} test subjects".format(tr_subj, te_subj))
   print(dim_to_use_2d)
   print(dim_to_use_3d)
-  
+  # Un-normalizing data for visualizations
   unNorm_ftrs2d = data_utils.unNormalize_dic(full_train_set_2d, data_mean_2d, data_std_2d, dim_to_use_2d)
   unNorm_ftrs3d = data_utils.unNormalize_dic(full_train_set_3d, data_mean_3d, data_std_3d, dim_to_use_3d)
   unNorm_ftes3d = data_utils.unNormalize_dic(full_test_set_3d, data_mean_3d, data_std_3d, dim_to_use_3d)
-
+  # Visualize the data
   viz.visualize_train_sample(unNorm_ftrs2d, unNorm_ftrs3d, FLAGS.camera_frame)
-  #viz.visualize_files_animation(unNorm_ftrs3d, unNorm_ftes3d)
   viz.visualize_files_oneatatime(unNorm_ftrs3d, unNorm_ftes3d)
 
+  # Getting only the dimensions to use (get rid of body coxas, other limb, antennas, abdomen
   train_set_3d, train_set_2d, test_set_3d, test_set_2d = {}, {}, {}, {}
   for k in full_train_set_3d:
     (f, c) = k
@@ -209,7 +209,7 @@ def train():
 
     step_time, loss = 0, 0
     current_epoch = 0
-    log_every_n_batches = 50
+    log_every_n_batches = 100
     losses, errors, joint_errors = [], [], []
     for _ in range( FLAGS.epochs ):
       current_epoch = current_epoch + 1
@@ -295,9 +295,7 @@ def train():
       step_time, loss = 0, 0
 
       sys.stdout.flush()
-    print(losses)
-    print(errors)
-    print(joint_errors)
+    # Save losses for future plots
     def print_list_tofile(l, filename):
       with open(filename, 'wb') as f:
         pickle.dump(l, f)
@@ -368,7 +366,7 @@ def evaluate_batches( sess, model,
 
   return total_err, coordwise_err, joint_err, step_time, loss
 
-def sample():
+def test():
   # Load camera parameters
   rcams = cameras.load_cameras()
 
@@ -385,6 +383,7 @@ def sample():
   print(data_std_3d)
 
   print("[+] done reading and normalizing data")
+  # Getting only the dimensions to use (get rid of body coxas, other limb, antennas, abdomen
   test_set_2d, test_set_3d = {}, {}
   for k in full_test_set_3d:
     (f, c) = k
@@ -398,7 +397,7 @@ def sample():
     
     # === Create the model ===
     print("[*] creating %d layers of %d units." % (FLAGS.num_layers, FLAGS.linear_size))
-    batch_size = FLAGS.batch_size #128 ???
+    batch_size = FLAGS.batch_size
     # Dropout probability 0 (keep probability 1) for sampling
     dp = 1.0
   
@@ -411,16 +410,13 @@ def sample():
     nbatches = len( encoder_inputs )
     print("[*] there are {0} test batches".format( nbatches ))
     
-    all_enc_in = []
-    all_dec_out = []
-    all_poses3d = []
-    diff_coordwise = []
-    all_dists = []
+    all_enc_in, all_dec_out, all_poses3d = [], [], []
+    diff_coordwise, all_dists = [], []
     for i in range( nbatches ):
       enc_in, dec_out = encoder_inputs[i], decoder_outputs[i]
       _, _, poses3d = model.step(sess, enc_in, dec_out, dp, isTraining=False)
       
-      # denormalize
+      # Un-normalize
       enc_in  = data_utils.unNormalize_batch(enc_in, data_mean_2d, data_std_2d, dim_to_use_2d)
       dec_out = data_utils.unNormalize_batch(dec_out, data_mean_3d, data_std_3d, dim_to_use_3d)
       poses3d = data_utils.unNormalize_batch(poses3d, data_mean_3d, data_std_3d, dim_to_use_3d)
@@ -472,21 +468,6 @@ def sample():
     files_dim = [v.shape[0] for v in test_set_3d.values()]
     files_dim.insert(0, 0)
     
-    '''# Convert back to world coordinates
-    if FLAGS.camera_frame:
-      for i, f in enumerate(files):
-        R, T, f, ce, d, intr = rcams[(f, data_utils.CAMERA_PROJ)]
-
-        def cam2world_centered(data_3d_camframe):
-          data_3d_worldframe = cameras.camera_to_world_frame(data_3d_camframe.reshape((-1, 3)), R, T)
-          data_3d_worldframe = data_3d_worldframe.reshape((-1, data_utils.DIMENSIONS*3))
-          return data_3d_worldframe
-
-        # Apply inverse rotation and translation
-        s, e = files_dim[i], files_dim[i+1]
-        dec_out[s:e] = cam2world_centered(dec_out[s:e])
-        poses3d[s:e] = cam2world_centered(poses3d[s:e])
-    '''
     # separate body coxas again for visualization purposes
     if FLAGS.origin_bc:
       data_utils.separate_body_coxa_2d(enc_in)
@@ -497,8 +478,8 @@ def sample():
     viz.visualize_test_animation(dec_out, poses3d)
 
 def main(_):
-  if FLAGS.sample:
-    sample()
+  if FLAGS.test:
+    test()
   else:
     train()
 

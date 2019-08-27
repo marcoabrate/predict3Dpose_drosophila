@@ -1,0 +1,16 @@
+=============================
+Val error avg (mm):  0.11 (0.04, 0.02, 0.09)
+=============================
+Error in joint 01 (mm):  0.05
+Error in joint 02 (mm):  0.07
+Error in joint 03 (mm):  0.11
+Error in joint 04 (mm):  0.18
+Error in joint 05 (mm):  0.04
+Error in joint 06 (mm):  0.06
+Error in joint 07 (mm):  0.13
+Error in joint 08 (mm):  0.19
+Error in joint 09 (mm):  0.04
+Error in joint 10 (mm):  0.07
+Error in joint 11 (mm):  0.11
+Error in joint 12 (mm):  0.22
+=============================

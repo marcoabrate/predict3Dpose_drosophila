@@ -31,29 +31,7 @@ def world_to_camera_frame(P, R, T, intr):
   Rt = np.hstack((R, T))
   proj = Rt.dot(P)
   
-  #proj = R.dot(P.T - T)
-  ''' Convert to pixels
-  pixels = intr.dot(proj)
-  pixels = pixels[:2,:] / pixels[2,:]
-  '''
   return proj.T
-
-def camera_to_world_frame(P, R, T):
-  """Inverse of world_to_camera_frame
-  Args
-    P: Nx3 points in camera coordinates
-    R: 3x3 Camera rotation matrix
-    T: 3x1 Camera translation parameters
-  Returns
-    X_cam: Nx3 points in world coordinates
-  """
-
-  assert len(P.shape) == 2
-  assert P.shape[1] == 3
-  
-  X_cam = R.T.dot( P.T ) + T # rotate and translate
-
-  return X_cam.T
 
 def load_camera_params( dic, ncamera ):
   """Load camera parameters
