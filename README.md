@@ -2,9 +2,12 @@
 
 This is the code for the semester project
 
-Predicting Drosophila melanogaster 3D pose from the 2D pose
+_Predicting Drosophila melanogaster 3D pose from the 2D pose_
+
 Student: Marco Pietro Abrate
+
 Supervisor: Semih Gunel
+
 EPFL Lab: [Neuroengineering Laboratory (RAMDYA)](https://ramdya-lab.epfl.ch/)
 
 The code in this repository was written by
@@ -17,7 +20,7 @@ The aim of this project is to reduce the number of cameras mounted on the platfo
 * [tensorflow](https://www.tensorflow.org/) 1.0 or later
 
 ### First of all
-Clone this repository and get the data. The data must be downloaded in the right folders. The name of the training and testing files can be found in the [project report](https://github.com/marcoabrate/predict3Dpose_drosophila/blob/master/bioproject_report.pdf).
+Clone this repository and get the data. The data must be downloaded in the right folders. The name of the training and testing files can be found in the [project report](https://github.com/marcoabrate/predict3Dpose_drosophila/blob/master/bioproject_report.pdf), Appendix A.
 
 ```bash
 git clone https://github.com/marcoabrate/predict3Dpose_drosophila
@@ -34,10 +37,10 @@ For showing the results of the final model, you have to go in the `3d-pose-basel
 
 This will produce a visualization similar to [this video](https://www.youtube.com/watch?v=N31742fBUZg).
 
-![Visualization example](/imgs/visualization_example.png)
+![Visualization example](/images/visualization_example.png)
 
 ### Training
 
-To train a model from scratch, run (from the folder `3d-pose-baseline`):
+To train a model from scratch, run (always from the `3d-pose-baseline` folder):
 
 `python flysrc/predict_3dpose.py --residual --batch_norm --dropout 0.5 --max_norm --epochs 200 --origin_bc --camera_frame --train_dir "new_model"`
