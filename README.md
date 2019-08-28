@@ -12,6 +12,10 @@ _EPFL Lab:_ [Neuroengineering Laboratory (RAMDYA)](https://ramdya-lab.epfl.ch/)
 
 The aim of this project is to reduce the number of cameras mounted on the platform that are used by [DeepFly3D](https://github.com/NeLy-EPFL/DeepFly3D) to predict the 3D pose of _Drosophila melanogaster_.
 
+[Midterm presentation](https://docs.google.com/presentation/d/1RYHLLUbZ69iTWStJf2jfNCoX_1pca8ejXuUkUgOqMFw/edit?usp=sharing)
+
+[Final presentation](https://docs.google.com/presentation/d/1vUkJZwJ__BXCS6LTd-akB5wZJdlIVXu0mbMJn1vfhtM/edit?usp=sharing)
+
 ### Dependencies (Python 3.7)
 
 * tensorflow 1.0 or later
