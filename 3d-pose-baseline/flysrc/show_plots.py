@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import rcParams, cycler
 
+joints_name = ["Coxa-femur", "Femur-tibia", "Tibia-tarsus", "Tarsus tip"]
+
 train_dir = "final_model_200epochs_origBC_camproj_size1024_dropout0.5_0.001/"
 with open(train_dir+"losses.pkl", 'rb') as f:
   losses = pickle.load(f)
@@ -49,8 +51,11 @@ for leg in range(3):
     plt.plot(joints[i])
   legend = []
   for i in range(4):
-    legend.append("Joint %d"%(i+1))
-  plt.legend(legend, prop={'size': 9}, loc='upper right')
+    legend.append(joints_name[i])
+  if leg > 1:
+    plt.legend(legend, prop={'size': 9}, loc='center right')
+  else:
+    plt.legend(legend, prop={'size': 9}, loc='upper right')
   plt.xlabel("Epoch", fontsize=13)
   plt.ylabel("L2 error (mm)", fontsize=13)
   plt.minorticks_on()

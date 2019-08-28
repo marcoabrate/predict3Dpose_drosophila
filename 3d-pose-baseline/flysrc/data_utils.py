@@ -22,20 +22,19 @@ import procrustes
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-random.seed(71)
-
 CAMERA_TO_USE = 1
 CAMERA_PROJ = CAMERA_TO_USE
 
-FILES_CALIB = [os.path.join("flydata_calib/", f) \
-     for f in os.listdir("flydata_calib/") if os.path.isfile(os.path.join("flydata_calib/", f))]
-FILES_CALIB.sort()
+#FILES_CALIB = [os.path.join("flydata_calib/", f) \
+#     for f in os.listdir("flydata_calib/") if os.path.isfile(os.path.join("flydata_calib/", f))]
+#FILES_CALIB.sort()
 TRAIN_FILES = [os.path.join("flydata_train/", f) \
      for f in os.listdir("flydata_train/") if os.path.isfile(os.path.join("flydata_train/", f))]
 TRAIN_FILES.sort()
 TEST_FILES = [os.path.join("flydata_test/", f) \
      for f in os.listdir("flydata_test/") if os.path.isfile(os.path.join("flydata_test/", f))]
 TEST_FILES.sort()
+'''
 if CAMERA_TO_USE > 3:
   TRAIN_FILES_C = [f.replace("calib/calib", "train/pose_result")
      for f in FILES_CALIB if f.replace("calib/calib", "train/pose_result") in TRAIN_FILES]
@@ -43,7 +42,7 @@ if CAMERA_TO_USE > 3:
      for f in FILES_CALIB if f.replace("calib/calib", "test/pose_result") in TEST_FILES]
   TRAIN_FILES = TRAIN_FILES_C
   TEST_FILES = TEST_FILES_C
-
+'''
 FILES = TRAIN_FILES + TEST_FILES
 FILE_NUM = len(FILES)
 FILE_REF = FILES[FILE_NUM-1]

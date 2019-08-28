@@ -44,7 +44,7 @@ tf.app.flags.DEFINE_boolean("origin_bc", False, "Superimpose body coxas at the o
 tf.app.flags.DEFINE_boolean("augment_data", False, "Augment the data using 2 additional cameras")
 
 # Directories
-tf.app.flags.DEFINE_string("train_dir", "test", "Training directory.")
+tf.app.flags.DEFINE_string("train_dir", "final_model", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("test", False, "Set to True for testing.")

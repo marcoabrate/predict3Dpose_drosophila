@@ -190,8 +190,8 @@ def update_files_oneatatime(num, data3d, files, ax3d):
   f = files[int(num/100)]
   ax3d.cla()
   title = f[7:]
-  if f in data_utils.FILES_CALIB:
-    title += "\nCalib"
+  #if f in data_utils.FILES_CALIB:
+  #  title += "\nCalib"
   ax3d.set_title(title)
   ax3d.set_xlim([-2, 2])
   ax3d.set_ylim([-2, 0])
@@ -236,20 +236,18 @@ def visualize_test_animation(test3d, predic):
   """
   test3d = signal_utils.filter_batch(test3d.reshape((-1,data_utils.DIMENSIONS,3)))
   predic = signal_utils.filter_batch(predic.reshape((-1,data_utils.DIMENSIONS,3)))
-  N = 10
-  dim = int(test3d.shape[0]/N)
-  for i in range(N):
-    fig = plt.figure()
-    ax3d = fig.add_subplot(111, projection='3d')
-    ax3d.set_title("prediction in RED 0")
-    channels = [test3d[dim*i].reshape((1,-1)), predic[dim*i].reshape((1,-1))]
-    get_3d_pose(channels, ax3d)
-    ani = animation.FuncAnimation(fig, update_test_animation, dim,
-      fargs=(test3d[dim*i:dim*(i+1)], predic[dim*i:dim*(i+1)], ax3d), interval=1, blit=False)
-    Writer = animation.writers['ffmpeg']
-    writer = Writer(fps=15, bitrate=1800)
-    ani.save("predictions%d.mp4"%i, writer=writer)
-    plt.show()
+  fig = plt.figure()
+  ax3d = fig.add_subplot(111, projection='3d')
+  ax3d.set_title("prediction in RED 0")
+  channels = [test3d[0].reshape((1,-1)), predic[0].reshape((1,-1))]
+  get_3d_pose(channels, ax3d)
+  ani = animation.FuncAnimation(fig, update_test_animation, test3d.shape[0],
+    fargs=(test3d, predic, ax3d), interval=1, blit=False)
+  # This is for saving the animations
+  #Writer = animation.writers['ffmpeg']
+  #writer = Writer(fps=15, bitrate=1800)
+  #ani.save("predictions%d.mp4"%i, writer=writer)
+  plt.show()
 
 def update_test_animation(num, test3d, predic, ax3d):
   ax3d.cla()

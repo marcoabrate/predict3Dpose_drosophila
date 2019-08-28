@@ -2,17 +2,12 @@ __pycache__
 
 3d-pose-baseline/flydata*
 3d-pose-baseline/data*
-3d-pose-baseline/test*
-3d-pose-baseline/exp*
 3d-pose-baseline/tr12te3*
 3d-pose-baseline/tr*
 3d-pose-baseline/calib*
 3d-pose-baseline/marco*
 *~
 *.pyc
-*.h5
-*.mp4
 *.mpeg
 *.swp
-*.png
 *.tar.gz
