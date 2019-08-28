@@ -4,11 +4,9 @@
 from __future__ import division
 
 import os
-import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-import cv2
 import data_utils
 import viz
 

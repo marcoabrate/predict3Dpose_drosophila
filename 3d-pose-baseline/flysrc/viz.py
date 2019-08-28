@@ -6,9 +6,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-import h5py
 import os
-import sys
 import random
 
 import data_utils

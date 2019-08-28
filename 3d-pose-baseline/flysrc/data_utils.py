@@ -12,10 +12,8 @@ import random
 
 import cameras
 import viz
-import h5py
 import glob
 import copy
-import sys
 import signal_utils
 import procrustes
 
